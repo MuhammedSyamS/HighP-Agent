@@ -85,7 +85,9 @@ export const Sidebar: React.FC = () => {
             <p className="text-xs font-semibold text-white truncate">
               {user?.firstName} {user?.lastName}
             </p>
-            <p className="text-[11px] text-slate-400 capitalize">{user?.role?.toLowerCase()}</p>
+            <p className="text-[11px] text-slate-400 font-medium">
+              {user?.role === UserRole.OWNER || user?.role === UserRole.ADMIN ? 'HR' : user?.role?.toLowerCase()}
+            </p>
           </div>
         </div>
         <button

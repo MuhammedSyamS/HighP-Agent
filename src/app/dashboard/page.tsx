@@ -622,7 +622,7 @@ export default function DashboardOverviewPage() {
                   >
                     <option value={UserRole.EMPLOYEE}>Employee</option>
                     <option value={UserRole.MANAGER}>Manager</option>
-                    <option value={UserRole.ADMIN}>Admin</option>
+                    <option value={UserRole.ADMIN}>HR</option>
                   </select>
                 </div>
               </div>

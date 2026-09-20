@@ -117,7 +117,7 @@ export default function EmployeeDetailPage() {
                 <StatusBadge status={profile?.currentStatus || ActivityState.OFFLINE} size="md" />
               </div>
               <p className="text-xs text-slate-500 mt-1 font-medium">
-                {user?.email} • Code: <span className="font-mono font-bold text-slate-700">{profile?.employeeCode}</span> • Role: <span className="capitalize font-semibold text-slate-700">{user?.role?.toLowerCase()}</span>
+                {user?.email} • Code: <span className="font-mono font-bold text-slate-700">{profile?.employeeCode}</span> • Role: <span className="font-semibold text-slate-700">{user?.role === 'OWNER' || user?.role === 'ADMIN' ? 'HR' : user?.role?.toLowerCase()}</span>
               </p>
             </div>
           </div>
