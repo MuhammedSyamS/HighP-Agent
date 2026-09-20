@@ -620,9 +620,9 @@ export default function DashboardOverviewPage() {
                     onChange={(e) => setNewRole(e.target.value as UserRole)}
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-500 font-semibold"
                   >
-                    <option value={UserRole.EMPLOYEE}>Employee</option>
-                    <option value={UserRole.MANAGER}>Manager</option>
-                    <option value={UserRole.ADMIN}>HR</option>
+                    <option value={UserRole.EMPLOYEE}>Employee (Workforce)</option>
+                    <option value={UserRole.MANAGER}>Manager / Team Lead (Under HR)</option>
+                    <option value={UserRole.HR}>HR (Administrator / Owner)</option>
                   </select>
                 </div>
               </div>

@@ -18,17 +18,18 @@ export const Sidebar: React.FC = () => {
   const pathname = location.pathname;
   const { user, company, logout } = useAuth();
 
-  const isManagerOrAdmin =
-    user?.role === UserRole.OWNER || user?.role === UserRole.ADMIN || user?.role === UserRole.MANAGER;
+  const isHR = user?.role === UserRole.HR;
+  const isManager = user?.role === UserRole.MANAGER;
+  const canAccessDashboard = isHR || isManager;
 
   const navItems = [
-    ...(isManagerOrAdmin
+    ...(canAccessDashboard
       ? [
           { name: 'Live Dashboard', href: '/dashboard', icon: LayoutDashboard },
           { name: 'Applications', href: '/dashboard/applications', icon: PieChart },
           { name: 'Reports', href: '/dashboard/reports', icon: FileBarChart },
           { name: 'Devices', href: '/dashboard/devices', icon: Laptop },
-          { name: 'Transparency & Policy', href: '/dashboard/settings', icon: ShieldCheck }
+          ...(isHR ? [{ name: 'Transparency & Policy', href: '/dashboard/settings', icon: ShieldCheck }] : [])
         ]
       : []),
     { name: 'My Employee Workspace', href: '/employee', icon: UserCheck }
@@ -86,7 +87,7 @@ export const Sidebar: React.FC = () => {
               {user?.firstName} {user?.lastName}
             </p>
             <p className="text-[11px] text-slate-400 font-medium">
-              {user?.role === UserRole.OWNER || user?.role === UserRole.ADMIN ? 'HR' : user?.role?.toLowerCase()}
+              {isHR ? 'HR' : isManager ? 'Manager / Team Lead' : 'Employee'}
             </p>
           </div>
         </div>
