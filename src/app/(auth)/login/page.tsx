@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../../lib/authContext';
 import {
   Lock,
@@ -32,10 +32,12 @@ const DEPARTMENTS = [
 
 export default function LoginPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { login, signup } = useAuth();
 
   // Mode: login or signup
-  const [authMode, setAuthMode] = useState<AuthMode>('login');
+  const isSignup = location.pathname === '/signup';
+  const [authMode, setAuthMode] = useState<AuthMode>(isSignup ? 'signup' : 'login');
 
   // Sign In state
   const [email, setEmail] = useState('');

@@ -18,6 +18,7 @@ export default function App() {
     <Routes>
       <Route path="/" element={<HighphausInternalPortal />} />
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/signup" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
 
       {/* Dashboard Routes with Nested Layout */}
