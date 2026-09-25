@@ -1,8 +1,17 @@
 import { io, Socket } from 'socket.io-client';
 
-const SOCKET_URL =
-  (typeof import.meta !== 'undefined' && import.meta.env && (import.meta.env.VITE_SOCKET_URL as string)) ||
-  (typeof window !== 'undefined' ? window.location.origin : 'http://127.0.0.1:5000');
+const getSocketUrl = (): string => {
+  const envUrl = (typeof import.meta !== 'undefined' && import.meta.env && (import.meta.env.VITE_SOCKET_URL as string)) || '';
+  if (typeof window !== 'undefined') {
+    const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    if (!isLocalhost && (!envUrl || envUrl.includes('127.0.0.1') || envUrl.includes('localhost'))) {
+      return 'https://highpbackend.vercel.app';
+    }
+  }
+  return envUrl || (typeof window !== 'undefined' ? window.location.origin : 'http://127.0.0.1:5000');
+};
+
+const SOCKET_URL = getSocketUrl();
 
 let socketInstance: Socket | null = null;
 

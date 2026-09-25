@@ -1,6 +1,15 @@
-const API_BASE_URL =
-  (typeof import.meta !== 'undefined' && import.meta.env && (import.meta.env.VITE_API_URL as string)) ||
-  '/api';
+const getApiBaseUrl = (): string => {
+  const envUrl = (typeof import.meta !== 'undefined' && import.meta.env && (import.meta.env.VITE_API_URL as string)) || '';
+  if (typeof window !== 'undefined') {
+    const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    if (!isLocalhost && (!envUrl || envUrl.includes('127.0.0.1') || envUrl.includes('localhost'))) {
+      return 'https://highpbackend.vercel.app/api';
+    }
+  }
+  return envUrl || '/api';
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 export interface ApiResponse<T = any> {
   data: T;
