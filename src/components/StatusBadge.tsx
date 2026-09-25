@@ -18,30 +18,30 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
     switch (status) {
       case ActivityState.ACTIVE:
         return {
-          bg: 'bg-emerald-500/10 text-emerald-700 border-emerald-500/20 dark:bg-emerald-500/20 dark:text-emerald-400',
-          dot: 'bg-emerald-500',
+          bg: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30 shadow-[0_0_12px_rgba(16,185,129,0.15)]',
+          dot: 'bg-emerald-400',
           pulse: 'bg-emerald-400',
           label: 'Active'
         };
       case ActivityState.IDLE:
         return {
-          bg: 'bg-amber-500/10 text-amber-700 border-amber-500/20 dark:bg-amber-500/20 dark:text-amber-400',
-          dot: 'bg-amber-500',
+          bg: 'bg-amber-500/15 text-amber-300 border-amber-500/30 shadow-[0_0_12px_rgba(245,158,11,0.15)]',
+          dot: 'bg-amber-400',
           pulse: 'bg-amber-400',
           label: 'Idle'
         };
       case ActivityState.BREAK:
         return {
-          bg: 'bg-cyan-500/10 text-cyan-700 border-cyan-500/20 dark:bg-cyan-500/20 dark:text-cyan-400',
-          dot: 'bg-cyan-500',
+          bg: 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30 shadow-[0_0_12px_rgba(6,182,212,0.15)]',
+          dot: 'bg-cyan-400',
           pulse: 'bg-cyan-400',
           label: 'On Break'
         };
       case ActivityState.OFFLINE:
       default:
         return {
-          bg: 'bg-slate-500/10 text-slate-600 border-slate-500/20 dark:bg-slate-500/20 dark:text-slate-400',
-          dot: 'bg-slate-400',
+          bg: 'bg-slate-800/60 text-slate-400 border-slate-700/60',
+          dot: 'bg-slate-500',
           pulse: '',
           label: 'Offline'
         };

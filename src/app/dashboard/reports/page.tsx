@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { Header } from '../../../components/Header';
 import { api } from '../../../lib/api';
 import { formatDuration } from '../../../lib/utils';
-import { FileBarChart, Download, Calendar, Users, Filter, Sparkles, Clock, CheckCircle2 } from 'lucide-react';
+import { Download, Calendar, Users, Filter, Sparkles, Clock, CheckCircle2, FileText, ChevronRight } from 'lucide-react';
 import { IDailyReportRow, IWeeklyMonthlyReportRow } from '@highp/shared';
 
 export default function ReportsPage() {
@@ -106,7 +106,7 @@ export default function ReportsPage() {
   });
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 bg-slate-50">
+    <div className="flex-1 flex flex-col min-h-0 bg-[#0B0F19] text-slate-100">
       <Header
         title="Activity & Attendance Reports"
         description="Audit-ready workforce telemetry reports with custom range filters and instant CSV export."
@@ -114,26 +114,26 @@ export default function ReportsPage() {
           <button
             onClick={handleExportCsv}
             disabled={isExporting || reportData.length === 0}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md shadow-emerald-600/20 transition-all hover:scale-105 disabled:opacity-50"
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-500/20 transition-all hover:scale-105 disabled:opacity-50 disabled:pointer-events-none"
           >
             <Download className="w-4 h-4" /> {isExporting ? 'Generating CSV...' : 'Export to CSV'}
           </button>
         }
       />
 
-      <main className="p-8 space-y-8 flex-1 overflow-y-auto">
+      <main className="p-6 md:p-8 space-y-6 md:space-y-8 flex-1 overflow-y-auto">
         {/* Controls and Quick Presets Bar */}
-        <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        <div className="bg-slate-900/60 backdrop-blur-xl border border-slate-800/80 rounded-2xl p-4 shadow-xl flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           {/* Tabs */}
-          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
+          <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800">
             {(['daily', 'weekly', 'monthly'] as const).map((type) => (
               <button
                 key={type}
                 onClick={() => setReportType(type)}
                 className={`px-4 py-2 rounded-lg text-xs font-bold capitalize transition-all ${
                   reportType === type
-                    ? 'bg-white text-indigo-600 shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
+                    ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
+                    : 'text-slate-400 hover:text-slate-200'
                 }`}
               >
                 {type} Report
@@ -146,25 +146,25 @@ export default function ReportsPage() {
             <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Presets:</span>
             <button
               onClick={() => setDatePreset('today')}
-              className="px-2.5 py-1 bg-slate-50 hover:bg-slate-100 text-slate-700 font-semibold text-xs rounded-lg border border-slate-200 transition-colors"
+              className="px-2.5 py-1.5 bg-slate-800/80 hover:bg-slate-700/80 text-slate-300 font-semibold text-xs rounded-xl border border-slate-700/80 transition-colors"
             >
               Today
             </button>
             <button
               onClick={() => setDatePreset('yesterday')}
-              className="px-2.5 py-1 bg-slate-50 hover:bg-slate-100 text-slate-700 font-semibold text-xs rounded-lg border border-slate-200 transition-colors"
+              className="px-2.5 py-1.5 bg-slate-800/80 hover:bg-slate-700/80 text-slate-300 font-semibold text-xs rounded-xl border border-slate-700/80 transition-colors"
             >
               Yesterday
             </button>
             <button
               onClick={() => setDatePreset('7days')}
-              className="px-2.5 py-1 bg-slate-50 hover:bg-slate-100 text-slate-700 font-semibold text-xs rounded-lg border border-slate-200 transition-colors"
+              className="px-2.5 py-1.5 bg-slate-800/80 hover:bg-slate-700/80 text-slate-300 font-semibold text-xs rounded-xl border border-slate-700/80 transition-colors"
             >
               Past 7 Days
             </button>
             <button
               onClick={() => setDatePreset('month')}
-              className="px-2.5 py-1 bg-slate-50 hover:bg-slate-100 text-slate-700 font-semibold text-xs rounded-lg border border-slate-200 transition-colors"
+              className="px-2.5 py-1.5 bg-slate-800/80 hover:bg-slate-700/80 text-slate-300 font-semibold text-xs rounded-xl border border-slate-700/80 transition-colors"
             >
               This Month
             </button>
@@ -172,49 +172,55 @@ export default function ReportsPage() {
 
           {/* Date Picker */}
           <div className="flex items-center gap-2">
-            <Calendar className="w-4 h-4 text-slate-400" />
-            <input
-              type="date"
-              value={dateStr}
-              onChange={(e) => setDateStr(e.target.value)}
-              className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none"
-            />
+            <div className="relative flex items-center">
+              <Calendar className="w-3.5 h-3.5 text-slate-400 absolute left-3 pointer-events-none" />
+              <input
+                type="date"
+                value={dateStr}
+                onChange={(e) => setDateStr(e.target.value)}
+                className="pl-8 pr-3 py-1.5 bg-slate-900/80 border border-slate-700/80 rounded-xl text-xs font-bold text-slate-200 focus:outline-none focus:border-indigo-500 transition-colors"
+              />
+            </div>
           </div>
         </div>
 
         {/* Report Aggregation Summary Banner */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs">
+          <div className="bg-slate-900/60 backdrop-blur-xl border border-slate-800/80 rounded-2xl p-5 shadow-xl relative overflow-hidden group">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-full blur-2xl pointer-events-none" />
             <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">
               Total Team Active
             </span>
-            <h3 className="text-2xl font-black text-emerald-600 mt-1">{formatDuration(totalActive)}</h3>
+            <h3 className="text-2xl font-black text-emerald-400 mt-1 tracking-tight">{formatDuration(totalActive)}</h3>
           </div>
-          <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs">
+          <div className="bg-slate-900/60 backdrop-blur-xl border border-slate-800/80 rounded-2xl p-5 shadow-xl relative overflow-hidden group">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/5 rounded-full blur-2xl pointer-events-none" />
             <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">
               Total Team Idle
             </span>
-            <h3 className="text-2xl font-black text-amber-600 mt-1">{formatDuration(totalIdle)}</h3>
+            <h3 className="text-2xl font-black text-amber-400 mt-1 tracking-tight">{formatDuration(totalIdle)}</h3>
           </div>
-          <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs">
+          <div className="bg-slate-900/60 backdrop-blur-xl border border-slate-800/80 rounded-2xl p-5 shadow-xl relative overflow-hidden group">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-cyan-500/5 rounded-full blur-2xl pointer-events-none" />
             <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">
               Total Break Time
             </span>
-            <h3 className="text-2xl font-black text-cyan-600 mt-1">{formatDuration(totalBreak)}</h3>
+            <h3 className="text-2xl font-black text-cyan-400 mt-1 tracking-tight">{formatDuration(totalBreak)}</h3>
           </div>
-          <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs">
+          <div className="bg-slate-900/60 backdrop-blur-xl border border-slate-800/80 rounded-2xl p-5 shadow-xl relative overflow-hidden group">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-500/5 rounded-full blur-2xl pointer-events-none" />
             <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">
               Total Logged Time
             </span>
-            <h3 className="text-2xl font-black text-indigo-600 mt-1">{formatDuration(totalSession)}</h3>
+            <h3 className="text-2xl font-black text-indigo-400 mt-1 tracking-tight">{formatDuration(totalSession)}</h3>
           </div>
         </div>
 
         {/* Report Table */}
-        <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs overflow-hidden">
-          <div className="p-5 border-b border-slate-200 flex items-center justify-between">
-            <h3 className="text-base font-bold text-slate-900 capitalize">{reportType} Activity Breakdown</h3>
-            <span className="text-xs font-bold px-3 py-1 bg-indigo-50 text-indigo-700 rounded-full border border-indigo-100">
+        <div className="bg-slate-900/60 backdrop-blur-xl border border-slate-800/80 rounded-2xl shadow-xl overflow-hidden">
+          <div className="p-5 border-b border-slate-800 flex items-center justify-between bg-slate-950/40">
+            <h3 className="text-base font-bold text-white capitalize">{reportType} Activity Breakdown</h3>
+            <span className="text-xs font-bold px-3 py-1 bg-indigo-500/10 text-indigo-300 rounded-full border border-indigo-500/30">
               {reportData.length} Employee Records
             </span>
           </div>
@@ -222,7 +228,7 @@ export default function ReportsPage() {
           <div className="overflow-x-auto">
             {reportType === 'daily' ? (
               <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50/80 text-slate-400 font-bold uppercase tracking-wider border-b border-slate-200">
+                <thead className="bg-slate-950/80 text-slate-400 font-bold uppercase tracking-wider border-b border-slate-800">
                   <tr>
                     <th className="px-6 py-3.5">Employee</th>
                     <th className="px-6 py-3.5">Department</th>
@@ -235,10 +241,11 @@ export default function ReportsPage() {
                     <th className="px-6 py-3.5">Top Applications</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+                <tbody className="divide-y divide-slate-800/50 font-medium text-slate-300">
                   {reportData.length === 0 ? (
                     <tr>
-                      <td colSpan={9} className="px-6 py-12 text-center text-slate-400">
+                      <td colSpan={9} className="px-6 py-14 text-center text-slate-500">
+                        <FileText className="w-8 h-8 text-slate-600 mx-auto mb-2 opacity-50" />
                         No activity records found for this period.
                       </td>
                     </tr>
@@ -254,24 +261,24 @@ export default function ReportsPage() {
                         : '—';
 
                       return (
-                        <tr key={row.employeeId} className="hover:bg-slate-50/80 transition-colors">
+                        <tr key={row.employeeId} className="hover:bg-slate-800/40 transition-colors group">
                           <td className="px-6 py-4">
-                            <p className="font-bold text-slate-900">{row.employeeName}</p>
+                            <p className="font-bold text-white group-hover:text-indigo-300 transition-colors">{row.employeeName}</p>
                             <p className="text-[11px] font-mono text-slate-400">{row.employeeCode}</p>
                           </td>
-                          <td className="px-6 py-4 text-slate-600">{row.department}</td>
-                          <td className="px-6 py-4 text-slate-600">{start}</td>
-                          <td className="px-6 py-4 text-slate-600">{end}</td>
-                          <td className="px-6 py-4 font-bold text-emerald-600">
+                          <td className="px-6 py-4 text-slate-300">{row.department}</td>
+                          <td className="px-6 py-4 text-slate-400 font-mono text-[11px]">{start}</td>
+                          <td className="px-6 py-4 text-slate-400 font-mono text-[11px]">{end}</td>
+                          <td className="px-6 py-4 font-bold text-emerald-400">
                             {formatDuration(row.activeSeconds)}
                           </td>
-                          <td className="px-6 py-4 text-amber-600 font-semibold">
+                          <td className="px-6 py-4 text-amber-400 font-semibold">
                             {formatDuration(row.idleSeconds)}
                           </td>
-                          <td className="px-6 py-4 text-cyan-600 font-semibold">
+                          <td className="px-6 py-4 text-cyan-400 font-semibold">
                             {formatDuration(row.breakSeconds)}
                           </td>
-                          <td className="px-6 py-4 font-bold text-indigo-600">
+                          <td className="px-6 py-4 font-bold text-indigo-400">
                             {formatDuration(row.totalSessionSeconds)}
                           </td>
                           <td className="px-6 py-4">
@@ -279,7 +286,7 @@ export default function ReportsPage() {
                               {(row.topApplications || []).map((app, ai) => (
                                 <span
                                   key={ai}
-                                  className="px-2 py-0.5 bg-slate-100 border border-slate-200 rounded-md text-[10px] text-slate-700 font-bold"
+                                  className="px-2 py-0.5 bg-slate-800/90 border border-slate-700/80 rounded-md text-[10px] text-slate-300 font-bold"
                                 >
                                   {app.applicationName}
                                 </span>
@@ -294,7 +301,7 @@ export default function ReportsPage() {
               </table>
             ) : (
               <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50/80 text-slate-400 font-bold uppercase tracking-wider border-b border-slate-200">
+                <thead className="bg-slate-950/80 text-slate-400 font-bold uppercase tracking-wider border-b border-slate-800">
                   <tr>
                     <th className="px-6 py-3.5">Employee</th>
                     <th className="px-6 py-3.5">Department</th>
@@ -307,36 +314,37 @@ export default function ReportsPage() {
                     <th className="px-6 py-3.5">Avg Daily Active</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+                <tbody className="divide-y divide-slate-800/50 font-medium text-slate-300">
                   {reportData.length === 0 ? (
                     <tr>
-                      <td colSpan={9} className="px-6 py-12 text-center text-slate-400">
+                      <td colSpan={9} className="px-6 py-14 text-center text-slate-500">
+                        <FileText className="w-8 h-8 text-slate-600 mx-auto mb-2 opacity-50" />
                         No activity records found for this period.
                       </td>
                     </tr>
                   ) : (
                     reportData.map((row: IWeeklyMonthlyReportRow) => (
-                      <tr key={row.employeeId} className="hover:bg-slate-50/80 transition-colors">
+                      <tr key={row.employeeId} className="hover:bg-slate-800/40 transition-colors group">
                         <td className="px-6 py-4">
-                          <p className="font-bold text-slate-900">{row.employeeName}</p>
+                          <p className="font-bold text-white group-hover:text-indigo-300 transition-colors">{row.employeeName}</p>
                           <p className="text-[11px] font-mono text-slate-400">{row.employeeCode}</p>
                         </td>
-                        <td className="px-6 py-4 text-slate-600">{row.department}</td>
-                        <td className="px-6 py-4 text-slate-600">{row.period}</td>
-                        <td className="px-6 py-4 font-bold text-slate-900">{row.workingDaysCount} days</td>
-                        <td className="px-6 py-4 font-bold text-emerald-600">
+                        <td className="px-6 py-4 text-slate-300">{row.department}</td>
+                        <td className="px-6 py-4 text-slate-400 font-mono text-[11px]">{row.period}</td>
+                        <td className="px-6 py-4 font-bold text-white">{row.workingDaysCount} days</td>
+                        <td className="px-6 py-4 font-bold text-emerald-400">
                           {formatDuration(row.totalActiveSeconds)}
                         </td>
-                        <td className="px-6 py-4 text-amber-600 font-semibold">
+                        <td className="px-6 py-4 text-amber-400 font-semibold">
                           {formatDuration(row.totalIdleSeconds)}
                         </td>
-                        <td className="px-6 py-4 text-cyan-600 font-semibold">
+                        <td className="px-6 py-4 text-cyan-400 font-semibold">
                           {formatDuration(row.totalBreakSeconds)}
                         </td>
-                        <td className="px-6 py-4 font-bold text-indigo-600">
+                        <td className="px-6 py-4 font-bold text-indigo-400">
                           {formatDuration(row.totalSessionSeconds)}
                         </td>
-                        <td className="px-6 py-4 font-bold text-slate-800">
+                        <td className="px-6 py-4 font-bold text-slate-200">
                           {formatDuration(row.averageDailyActiveSeconds)}
                         </td>
                       </tr>

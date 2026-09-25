@@ -33,17 +33,17 @@ export const Header: React.FC<HeaderProps> = ({ title, description, actions }) =
   }, []);
 
   return (
-    <header className="bg-white/80 backdrop-blur-md border-b border-slate-200/80 px-8 py-4 flex items-center justify-between sticky top-0 z-20 transition-all">
+    <header className="bg-slate-900/80 backdrop-blur-xl border-b border-slate-800 px-6 sm:px-8 py-4 flex items-center justify-between sticky top-0 z-20 transition-all text-white">
       <div>
         <div className="flex items-center gap-2.5">
-          <h1 className="text-lg font-extrabold text-slate-900 tracking-tight">{title}</h1>
+          <h1 className="text-lg font-extrabold text-white tracking-tight">{title}</h1>
           {company?.name && (
-            <span className="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
+            <span className="hidden sm:inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-800 text-indigo-300 border border-slate-700">
               {company.name}
             </span>
           )}
         </div>
-        {description && <p className="text-xs text-slate-500 mt-0.5 font-medium">{description}</p>}
+        {description && <p className="text-xs text-slate-400 mt-0.5 font-medium">{description}</p>}
       </div>
 
       <div className="flex items-center gap-3">
@@ -51,22 +51,22 @@ export const Header: React.FC<HeaderProps> = ({ title, description, actions }) =
         <div
           className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-semibold transition-all ${
             isConnected
-              ? 'bg-emerald-500/10 text-emerald-700 border-emerald-500/20'
-              : 'bg-amber-500/10 text-amber-700 border-amber-500/20'
+              ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30 shadow-sm shadow-emerald-500/10'
+              : 'bg-amber-500/10 text-amber-400 border-amber-500/30'
           }`}
         >
           <span className="relative flex h-2 w-2">
             {isConnected ? (
               <>
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span>
               </>
             ) : (
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-400"></span>
             )}
           </span>
           <span className="text-[11px] font-bold">
-            {isConnected ? 'Real-Time Sync Active' : 'Connecting Real-Time...'}
+            {isConnected ? 'Live Telemetry Connected' : 'Connecting Stream...'}
           </span>
         </div>
 
