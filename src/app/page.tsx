@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../lib/authContext';
+import { getDesktopAgentDownloadUrl } from '../lib/constants';
 import {
   ShieldCheck,
   Activity,
@@ -99,11 +100,13 @@ export default function HighphausInternalPortal() {
               {mounted && user ? `Enter ${destinationText}` : 'Enter Agency Workspace'} <ArrowRight className="w-4 h-4" />
             </Link>
             <a
-              href="#agent-setup"
+              href={getDesktopAgentDownloadUrl()}
+              target="_blank"
+              rel="noopener noreferrer"
               className="inline-flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-slate-200 font-bold px-8 py-3.5 rounded-xl border border-slate-700 text-sm transition-all"
             >
               <Download className="w-4 h-4 text-indigo-400" />
-              Highphaus Desktop Agent (Windows)
+              Download Desktop Agent (Windows)
             </a>
           </div>
 
@@ -191,16 +194,24 @@ export default function HighphausInternalPortal() {
                 </div>
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                  <span>Configured directly for company server at <code className="text-indigo-300 bg-slate-800 px-1.5 py-0.5 rounded">http://localhost:5000</code></span>
+                  <span>Configured directly for company server at <code className="text-indigo-300 bg-slate-800 px-1.5 py-0.5 rounded">https://highpbackend.vercel.app</code></span>
                 </div>
               </div>
 
               <div className="mt-8 flex flex-wrap items-center gap-4">
-                <Link
-                  to="/login"
+                <a
+                  href={getDesktopAgentDownloadUrl()}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-6 py-3 rounded-xl shadow-lg shadow-indigo-600/30 text-xs transition-all hover:scale-105"
                 >
-                  Sign In & Download Device Token <ArrowRight className="w-4 h-4" />
+                  <Download className="w-4 h-4" /> Download Desktop Agent (.exe)
+                </a>
+                <Link
+                  to="/login"
+                  className="inline-flex items-center gap-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium px-6 py-3 rounded-xl text-xs transition-all border border-slate-700"
+                >
+                  Sign In to Web Portal <ArrowRight className="w-4 h-4" />
                 </Link>
               </div>
             </div>

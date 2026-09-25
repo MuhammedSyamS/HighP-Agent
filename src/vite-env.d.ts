@@ -1,8 +1,12 @@
 /// <reference types="vite/client" />
 
+declare module 'react-dom/client';
+
 interface ImportMetaEnv {
   readonly VITE_API_URL?: string;
   readonly VITE_SOCKET_URL?: string;
+  readonly VITE_DESKTOP_AGENT_URL?: string;
+  readonly VITE_DESKTOP_AGENT_REPO_URL?: string;
 }
 
 interface ImportMeta {

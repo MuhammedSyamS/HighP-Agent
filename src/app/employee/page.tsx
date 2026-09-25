@@ -21,9 +21,11 @@ import {
   Sparkles,
   CheckCircle2,
   LogOut,
-  ArrowLeft
+  ArrowLeft,
+  Download
 } from 'lucide-react';
 import { ActivityState, BreakReason } from '@highp/shared';
+import { getDesktopAgentDownloadUrl } from '../../lib/constants';
 
 export default function EmployeeWorkspacePage() {
   const navigate = useNavigate();
@@ -180,6 +182,34 @@ export default function EmployeeWorkspacePage() {
       </header>
 
       <main className="p-4 sm:p-8 pb-24 space-y-6 sm:space-y-8 flex-1 overflow-y-auto max-w-6xl mx-auto w-full">
+        {/* Desktop Agent Banner */}
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-white shadow-lg">
+          <div className="flex items-center gap-3.5">
+            <div className="w-10 h-10 rounded-xl bg-indigo-600/30 border border-indigo-500/40 flex items-center justify-center shrink-0 text-indigo-400">
+              <Laptop className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="text-sm font-bold flex items-center gap-2">
+                HighP Desktop Agent for Windows
+                <span className="bg-indigo-500/20 text-indigo-300 text-[10px] font-semibold px-2 py-0.5 rounded-full border border-indigo-500/30">
+                  Required on Workstation
+                </span>
+              </div>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Install on your PC to automatically track active applications, working hours, and offline time.
+              </p>
+            </div>
+          </div>
+          <a
+            href={getDesktopAgentDownloadUrl()}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-4 py-2.5 rounded-xl text-xs shadow-md shadow-indigo-600/30 transition-all hover:scale-105 shrink-0"
+          >
+            <Download className="w-4 h-4" /> Download Agent (.exe)
+          </a>
+        </div>
+
         {/* Work Session & Attendance Hero Card */}
         <div className="bg-gradient-to-r from-white via-white to-indigo-50/40 border border-slate-200/80 rounded-2xl sm:rounded-3xl p-5 sm:p-8 shadow-sm">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
