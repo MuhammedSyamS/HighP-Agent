@@ -22,7 +22,8 @@ import {
   CheckCircle2,
   LogOut,
   ArrowLeft,
-  Download
+  Download,
+  Check
 } from 'lucide-react';
 import { ActivityState, BreakReason } from '@highp/shared';
 import { getDesktopAgentDownloadUrl } from '../../lib/constants';
@@ -37,9 +38,48 @@ export default function EmployeeWorkspacePage() {
   const [loading, setLoading] = useState(false);
   const [breakReason, setBreakReason] = useState<string>(BreakReason.LUNCH);
 
+  const [showInstallBanner, setShowInstallBanner] = useState(true);
+  const [autoDownloaded, setAutoDownloaded] = useState(false);
+
+  const triggerAgentDownload = useCallback(() => {
+    try {
+      const link = document.createElement('a');
+      link.href = getDesktopAgentDownloadUrl();
+      link.setAttribute('download', 'HighP-Agent-Setup-1.0.0.exe');
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setAutoDownloaded(true);
+    } catch (e) {
+      console.error('Auto download trigger failed:', e);
+    }
+  }, []);
+
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (mounted && user) {
+      const isInstalled = localStorage.getItem('highp_agent_installed') === 'true';
+      if (isInstalled) {
+        setShowInstallBanner(false);
+      } else {
+        // Automatically start the download after 1.5 seconds on first login
+        const timer = setTimeout(() => {
+          triggerAgentDownload();
+        }, 1500);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [mounted, user, triggerAgentDownload]);
+
+  const handleDismissInstall = () => {
+    localStorage.setItem('highp_agent_installed', 'true');
+    setShowInstallBanner(false);
+  };
 
   useEffect(() => {
     if (profile) {
@@ -182,33 +222,59 @@ export default function EmployeeWorkspacePage() {
       </header>
 
       <main className="p-4 sm:p-8 pb-24 space-y-6 sm:space-y-8 flex-1 overflow-y-auto max-w-6xl mx-auto w-full">
-        {/* Desktop Agent Banner */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-white shadow-lg">
-          <div className="flex items-center gap-3.5">
-            <div className="w-10 h-10 rounded-xl bg-indigo-600/30 border border-indigo-500/40 flex items-center justify-center shrink-0 text-indigo-400">
-              <Laptop className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="text-sm font-bold flex items-center gap-2">
-                HighP Desktop Agent for Windows
-                <span className="bg-indigo-500/20 text-indigo-300 text-[10px] font-semibold px-2 py-0.5 rounded-full border border-indigo-500/30">
-                  Required on Workstation
-                </span>
+        {/* Desktop Agent Auto-Download & Setup Banner */}
+        {showInstallBanner && (
+          <div className="bg-gradient-to-r from-slate-950 via-slate-900 to-indigo-950 border border-indigo-500/30 rounded-2xl p-4 sm:p-5 text-white shadow-xl relative overflow-hidden">
+            <div className="absolute top-0 right-0 translate-x-8 -translate-y-8 w-40 h-40 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
+
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
+              <div className="flex items-start sm:items-center gap-3.5">
+                <div className="w-11 h-11 rounded-2xl bg-indigo-600/30 border border-indigo-500/40 flex items-center justify-center shrink-0 text-indigo-400 shadow-inner">
+                  <Laptop className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="text-sm sm:text-base font-bold text-white">
+                      HighP Desktop Agent (1-Click Install)
+                    </h3>
+                    <span className="bg-indigo-500/20 text-indigo-300 text-[10px] font-bold px-2 py-0.5 rounded-full border border-indigo-500/30 flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                      {autoDownloaded ? 'Downloaded to browser' : 'Auto-Downloading...'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-300 mt-1 max-w-xl leading-relaxed">
+                    {autoDownloaded ? (
+                      <>
+                        <strong className="text-indigo-300">Next Step:</strong> Click <code className="bg-slate-800 text-indigo-200 px-1 py-0.5 rounded text-[11px]">HighP Agent Setup 1.0.0.exe</code> in your browser downloads bar to complete 1-click install.
+                      </>
+                    ) : (
+                      'Your download is starting automatically. Click the downloaded file to connect your computer.'
+                    )}
+                  </p>
+                </div>
               </div>
-              <p className="text-xs text-slate-400 mt-0.5">
-                Install on your PC to automatically track active applications, working hours, and offline time.
-              </p>
+
+              <div className="flex items-center gap-2.5 shrink-0 flex-wrap">
+                <button
+                  type="button"
+                  onClick={triggerAgentDownload}
+                  className="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-4 py-2 rounded-xl text-xs shadow-md shadow-indigo-600/30 transition-all hover:scale-105"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  {autoDownloaded ? 'Download Again' : 'Download Now'}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDismissInstall}
+                  className="inline-flex items-center gap-1.5 bg-slate-800/80 hover:bg-slate-700 text-slate-200 font-medium px-3.5 py-2 rounded-xl text-xs border border-slate-700 transition-colors"
+                >
+                  <Check className="w-3.5 h-3.5 text-emerald-400" />
+                  I've Installed It
+                </button>
+              </div>
             </div>
           </div>
-          <a
-            href={getDesktopAgentDownloadUrl()}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-4 py-2.5 rounded-xl text-xs shadow-md shadow-indigo-600/30 transition-all hover:scale-105 shrink-0"
-          >
-            <Download className="w-4 h-4" /> Download Agent (.exe)
-          </a>
-        </div>
+        )}
 
         {/* Work Session & Attendance Hero Card */}
         <div className="bg-gradient-to-r from-white via-white to-indigo-50/40 border border-slate-200/80 rounded-2xl sm:rounded-3xl p-5 sm:p-8 shadow-sm">
