@@ -1,5 +1,53 @@
+# ==============================================================================
+# HighP Frontend - Git Ignore Rules
+# ==============================================================================
+
+# Dependencies
 node_modules/
+.pnp
+.pnp.js
+
+# Production Build Outputs
 dist/
-.env.local
+build/
+out/
 .next/
+*.tsbuildinfo
+
+# Environment & Local Secrets
+.env
+.env.local
+.env.*.local
+.env.development
+.env.production
+!.env.example
+
+# Logs and Debugging
+logs/
 *.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Framework & Hosting Platform Caches
+.vercel/
+.turbo/
+.vite/
+
+# OS-Specific Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE & Editor Settings
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+*.swp
+*.swo
