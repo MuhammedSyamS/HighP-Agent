@@ -181,7 +181,11 @@ export default function EmployeeWorkspacePage() {
   }, [isWorking]);
 
 const getBrowserAppName = (): string => {
-  if (typeof window === 'undefined') return 'Web Browser';
+  if (typeof window === 'undefined') return '';
+  // If the tab is hidden or lacks focus, the user is working in an external desktop app (like Antigravity IDE)
+  if (typeof document !== 'undefined' && (document.hidden || !document.hasFocus())) {
+    return '';
+  }
   const ua = navigator.userAgent;
   if (ua.includes('Edg/')) return 'Microsoft Edge';
   if ((navigator as any).brave || ua.includes('Brave')) return 'Brave Browser';
@@ -208,7 +212,7 @@ const getBrowserAppName = (): string => {
 
         await api.post('/attendance/heartbeat', {
           status: effectiveStatus,
-          currentApplication: browserApp,
+          ...(browserApp ? { currentApplication: browserApp } : {}),
           recentDurationSeconds: durationSec,
           idleSeconds: idleTimeSeconds
         });
