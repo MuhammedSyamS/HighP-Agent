@@ -72,9 +72,10 @@ export default function DashboardOverviewPage() {
 
   const fetchDashboardData = useCallback(async () => {
     try {
-      const [overviewRes, employeesRes] = await Promise.all([
+      const [overviewRes, employeesRes, activityRes] = await Promise.all([
         api.get('/employees/overview'),
-        api.get('/employees')
+        api.get('/employees'),
+        api.get('/activity?limit=10')
       ]);
 
       if (overviewRes.data?.data) {
@@ -82,6 +83,20 @@ export default function DashboardOverviewPage() {
       }
       if (employeesRes.data?.data) {
         setEmployees(employeesRes.data.data);
+      }
+      if (activityRes.data?.data && Array.isArray(activityRes.data.data)) {
+        const streamItems = activityRes.data.data
+          .filter((evt: any) => evt.applicationName && !evt.applicationName.toLowerCase().includes('highp'))
+          .map((evt: any) => ({
+            id: evt.eventId || evt._id,
+            name: evt.employeeId?.userId
+              ? `${evt.employeeId.userId.firstName || ''} ${evt.employeeId.userId.lastName || ''}`.trim() || 'Employee'
+              : 'Employee',
+            status: evt.type === 'IDLE_INTERVAL' ? 'IDLE' : 'ACTIVE',
+            app: evt.applicationName || 'Active Workstation',
+            time: new Date(evt.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          }));
+        setRecentLiveEvents(streamItems);
       }
     } catch (err) {
       console.error('[Dashboard] Fetch error:', err);
@@ -152,8 +167,22 @@ export default function DashboardOverviewPage() {
       };
 
       const handleActivityChange = (data: any) => {
-        setEmployees((prev) =>
-          prev.map((emp) => {
+        setEmployees((prev) => {
+          const target = prev.find((e) => e._id === data.employeeId);
+          if (target && data.currentApplication) {
+            setRecentLiveEvents((rev) => [
+              {
+                id: Date.now(),
+                name: `${target.userId?.firstName || 'Employee'} ${target.userId?.lastName || ''}`.trim(),
+                status: target.currentStatus || 'ACTIVE',
+                app: data.currentApplication,
+                time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+              },
+              ...rev.slice(0, 9)
+            ]);
+          }
+
+          return prev.map((emp) => {
             if (emp._id === data.employeeId) {
               return {
                 ...emp,
@@ -161,8 +190,8 @@ export default function DashboardOverviewPage() {
               };
             }
             return emp;
-          })
-        );
+          });
+        });
       };
 
       socket.on('employee:status_changed', handleStatusChange);
@@ -573,7 +602,11 @@ export default function DashboardOverviewPage() {
                               </div>
                               <span className="font-semibold text-slate-200 truncate max-w-[180px]">
                                 {emp.currentStatus === ActivityState.OFFLINE
-                                  ? '—'
+                                  ? (emp.currentApplication ? (
+                                      <span className="text-slate-400 font-normal">Last: {emp.currentApplication}</span>
+                                    ) : (
+                                      '—'
+                                    ))
                                   : emp.currentApplication || 'No active application'}
                               </span>
                             </div>
