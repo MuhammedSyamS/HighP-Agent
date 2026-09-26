@@ -46,7 +46,7 @@ export default function EmployeeWorkspacePage() {
   const [liveIdleSeconds, setLiveIdleSeconds] = useState(0);
   const [liveBreakSeconds, setLiveBreakSeconds] = useState(0);
   const [isIdle, setIsIdle] = useState(false);
-  const [currentAppFocus, setCurrentAppFocus] = useState('HighP Web Workspace');
+  const [currentAppFocus, setCurrentAppFocus] = useState('Active Workstation');
   const lastActivityRef = React.useRef(Date.now());
 
   const triggerAgentDownload = useCallback(() => {
@@ -193,16 +193,12 @@ export default function EmployeeWorkspacePage() {
             ? ActivityState.IDLE
             : ActivityState.ACTIVE);
         const idleTimeSeconds = Math.floor((Date.now() - lastActivityRef.current) / 1000);
-        const isTabHidden = typeof document !== 'undefined' && document.hidden;
-        const appName = isTabHidden ? 'Browser (Background Tab)' : 'HighP Web Workspace';
 
         await api.post('/attendance/heartbeat', {
           status: effectiveStatus,
-          currentApplication: appName,
           recentDurationSeconds: durationSec,
           idleSeconds: idleTimeSeconds
         });
-        setCurrentAppFocus(appName);
       } catch (err) {
         console.warn('[Tracking] Heartbeat sync warning:', err);
       }
@@ -224,7 +220,6 @@ export default function EmployeeWorkspacePage() {
       await api.post('/attendance/start', {});
       await api.post('/attendance/heartbeat', {
         status: ActivityState.ACTIVE,
-        currentApplication: 'HighP Web Workspace',
         recentDurationSeconds: 1,
         idleSeconds: 0
       });
@@ -537,16 +532,30 @@ export default function EmployeeWorkspacePage() {
               <h3 className="font-bold text-white text-sm mb-4 pb-2 border-b border-slate-800">
                 My Software Usage Today
               </h3>
-              {appUsages.length === 0 ? (
+              {appUsages.filter(
+                (a) =>
+                  !a.applicationName.toLowerCase().includes('highp') &&
+                  !a.applicationName.toLowerCase().includes('internal workforce') &&
+                  !a.applicationName.toLowerCase().includes('highphaus') &&
+                  !a.applicationName.toLowerCase().includes('electron')
+              ).length === 0 ? (
                 <p className="text-xs text-slate-500 py-6 text-center">No app activity recorded yet today.</p>
               ) : (
                 <div className="space-y-3">
-                  {appUsages.map((app, i) => (
-                    <div key={i} className="flex items-center justify-between text-xs font-semibold">
-                      <span className="text-slate-200 truncate max-w-[150px]">{app.applicationName}</span>
-                      <span className="text-slate-400 font-mono text-[11px]">{formatDuration(app.totalSeconds)}</span>
-                    </div>
-                  ))}
+                  {appUsages
+                    .filter(
+                      (a) =>
+                        !a.applicationName.toLowerCase().includes('highp') &&
+                        !a.applicationName.toLowerCase().includes('internal workforce') &&
+                        !a.applicationName.toLowerCase().includes('highphaus') &&
+                        !a.applicationName.toLowerCase().includes('electron')
+                    )
+                    .map((app, i) => (
+                      <div key={i} className="flex items-center justify-between text-xs font-semibold">
+                        <span className="text-slate-200 truncate max-w-[150px]">{app.applicationName}</span>
+                        <span className="text-slate-400 font-mono text-[11px]">{formatDuration(app.totalSeconds)}</span>
+                      </div>
+                    ))}
                 </div>
               )}
             </div>
