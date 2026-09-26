@@ -307,17 +307,31 @@ export default function LoginPage() {
                     />
                     Remember me on this device
                   </label>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEmail('alex@highphaus.com');
-                      setPassword('Password@123');
-                      setLoginError('');
-                    }}
-                    className="text-xs text-indigo-400 hover:text-indigo-300 font-semibold transition-colors"
-                  >
-                    ⚡ Fill sample login
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEmail('shamsaifudheen@gmail.com');
+                        setPassword('Password@123');
+                        setLoginError('');
+                      }}
+                      className="text-xs text-indigo-400 hover:text-indigo-300 font-semibold transition-colors"
+                    >
+                      ⚡ HR Login
+                    </button>
+                    <span className="text-slate-600 text-xs">•</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEmail('highphaus@gmail.com');
+                        setPassword('Password@123');
+                        setLoginError('');
+                      }}
+                      className="text-xs text-indigo-400 hover:text-indigo-300 font-semibold transition-colors"
+                    >
+                      ⚡ Employee Login
+                    </button>
+                  </div>
                 </div>
 
                 <button

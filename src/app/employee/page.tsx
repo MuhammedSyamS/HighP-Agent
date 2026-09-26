@@ -193,7 +193,8 @@ export default function EmployeeWorkspacePage() {
             ? ActivityState.IDLE
             : ActivityState.ACTIVE);
         const idleTimeSeconds = Math.floor((Date.now() - lastActivityRef.current) / 1000);
-        const appName = document.title || 'HighP Web Workspace';
+        const isTabHidden = typeof document !== 'undefined' && document.hidden;
+        const appName = isTabHidden ? 'Browser (Background Tab)' : 'HighP Web Workspace';
 
         await api.post('/attendance/heartbeat', {
           status: effectiveStatus,
@@ -223,7 +224,7 @@ export default function EmployeeWorkspacePage() {
       await api.post('/attendance/start', {});
       await api.post('/attendance/heartbeat', {
         status: ActivityState.ACTIVE,
-        currentApplication: document.title || 'HighP Web Workspace',
+        currentApplication: 'HighP Web Workspace',
         recentDurationSeconds: 1,
         idleSeconds: 0
       });
