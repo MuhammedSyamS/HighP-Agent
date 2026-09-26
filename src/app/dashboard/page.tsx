@@ -140,7 +140,7 @@ export default function DashboardOverviewPage() {
                 id: Date.now(),
                 name: `${targetEmp.userId?.firstName || 'Employee'} ${targetEmp.userId?.lastName || ''}`,
                 status: data.status,
-                app: data.currentApplication || 'System / Desktop',
+                app: data.currentApplication || 'Active Workstation',
                 time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
               },
               ...rev.slice(0, 9)
@@ -495,6 +495,7 @@ export default function DashboardOverviewPage() {
                   <tr>
                     <th className="px-6 py-4">Employee</th>
                     <th className="px-6 py-4">Live Status</th>
+                    <th className="px-6 py-4">Tracking Source</th>
                     <th className="px-6 py-4">Foreground Application</th>
                     <th className="px-6 py-4">Active Today</th>
                     <th className="px-6 py-4">Idle Time</th>
@@ -506,7 +507,7 @@ export default function DashboardOverviewPage() {
                 <tbody className="divide-y divide-slate-800/60 font-medium text-slate-300">
                   {filteredEmployees.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="px-6 py-14 text-center text-slate-400">
+                      <td colSpan={9} className="px-6 py-14 text-center text-slate-400">
                         <Users className="w-8 h-8 text-slate-600 mx-auto mb-2" />
                         No team members match the selected criteria.
                       </td>
@@ -551,6 +552,21 @@ export default function DashboardOverviewPage() {
                             <StatusBadge status={emp.currentStatus} />
                           </td>
                           <td className="px-6 py-4">
+                            {emp.currentStatus === ActivityState.OFFLINE ? (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-slate-800/80 text-slate-400 border border-slate-700">
+                                OFFLINE
+                              </span>
+                            ) : emp.currentDeviceId ? (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-indigo-500/15 text-indigo-300 border border-indigo-500/30">
+                                <Laptop className="w-3.5 h-3.5 text-indigo-400" /> DESKTOP AGENT
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                                <Radio className="w-3.5 h-3.5 text-amber-400" /> WEB PRESENCE
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4">
                             <div className="flex items-center gap-2">
                               <div className="w-6 h-6 rounded-md bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-400">
                                 <Monitor className="w-3.5 h-3.5" />
@@ -558,7 +574,7 @@ export default function DashboardOverviewPage() {
                               <span className="font-semibold text-slate-200 truncate max-w-[180px]">
                                 {emp.currentStatus === ActivityState.OFFLINE
                                   ? '—'
-                                  : emp.currentApplication || 'System / Desktop'}
+                                  : emp.currentApplication || 'No active application'}
                               </span>
                             </div>
                           </td>
@@ -616,14 +632,29 @@ export default function DashboardOverviewPage() {
                         </p>
                       </div>
                     </div>
-                    <StatusBadge status={emp.currentStatus} />
+                    <div className="flex flex-col items-end gap-1.5">
+                      <StatusBadge status={emp.currentStatus} />
+                      {emp.currentStatus === ActivityState.OFFLINE ? (
+                        <span className="text-[10px] font-bold text-slate-500 bg-slate-800/60 px-2 py-0.5 rounded-md border border-slate-700/50">
+                          OFFLINE
+                        </span>
+                      ) : emp.currentDeviceId ? (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-indigo-300 bg-indigo-500/10 px-2 py-0.5 rounded-md border border-indigo-500/20">
+                          <Laptop className="w-3 h-3 text-indigo-400" /> DESKTOP
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded-md border border-amber-500/20">
+                          <Radio className="w-3 h-3 text-amber-400" /> WEB
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   {/* Current Active App Spotlight */}
                   <div className="p-3 bg-slate-950/70 rounded-xl border border-slate-800 flex items-center justify-between">
                     <span className="text-[11px] font-semibold text-slate-400">Current App Focus</span>
                     <span className="font-bold text-xs text-indigo-300 truncate max-w-[150px]">
-                      {emp.currentStatus === ActivityState.OFFLINE ? 'None (Offline)' : emp.currentApplication || 'System Desktop'}
+                      {emp.currentStatus === ActivityState.OFFLINE ? 'None (Offline)' : emp.currentApplication || 'No active application'}
                     </span>
                   </div>
 
