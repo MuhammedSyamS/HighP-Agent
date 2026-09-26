@@ -3,7 +3,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { Header } from '../../components/Header';
-import { StatCard } from '../../components/StatCard';
 import { StatusBadge } from '../../components/StatusBadge';
 import { api } from '../../lib/api';
 import { getSocket } from '../../lib/socket';
@@ -12,8 +11,6 @@ import { getDesktopAgentDownloadUrl } from '../../lib/constants';
 import {
   Users,
   Activity,
-  Moon,
-  Coffee,
   Clock,
   Search,
   UserPlus,
@@ -33,9 +30,53 @@ import {
   ChevronRight,
   Shield,
   Layers,
-  Check
+  Globe,
+  Code2,
+  Palette,
+  Terminal,
+  Folder,
+  MessageSquare,
+  FileSpreadsheet,
+  Compass,
+  Cpu
 } from 'lucide-react';
 import { ActivityState, IDashboardOverview, UserRole } from '@highp/shared';
+
+// Helper to provide colorful brand-aware application icons
+const getAppVisuals = (appName?: string) => {
+  const name = (appName || '').toLowerCase();
+  if (name.includes('brave')) {
+    return { icon: Compass, color: 'text-orange-400 bg-orange-500/10 border-orange-500/30' };
+  }
+  if (name.includes('chrome')) {
+    return { icon: Globe, color: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30' };
+  }
+  if (name.includes('edge')) {
+    return { icon: Globe, color: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/30' };
+  }
+  if (name.includes('firefox')) {
+    return { icon: Globe, color: 'text-amber-400 bg-amber-500/10 border-amber-500/30' };
+  }
+  if (name.includes('code') || name.includes('antigravity') || name.includes('studio') || name.includes('cursor')) {
+    return { icon: Code2, color: 'text-indigo-400 bg-indigo-500/10 border-indigo-500/30' };
+  }
+  if (name.includes('figma') || name.includes('photoshop') || name.includes('illustrator') || name.includes('blender')) {
+    return { icon: Palette, color: 'text-purple-400 bg-purple-500/10 border-purple-500/30' };
+  }
+  if (name.includes('terminal') || name.includes('powershell') || name.includes('cmd') || name.includes('bash')) {
+    return { icon: Terminal, color: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30' };
+  }
+  if (name.includes('slack') || name.includes('teams') || name.includes('discord')) {
+    return { icon: MessageSquare, color: 'text-pink-400 bg-pink-500/10 border-pink-500/30' };
+  }
+  if (name.includes('excel') || name.includes('sheet') || name.includes('word') || name.includes('notion')) {
+    return { icon: FileSpreadsheet, color: 'text-sky-400 bg-sky-500/10 border-sky-500/30' };
+  }
+  if (name.includes('explorer')) {
+    return { icon: Folder, color: 'text-amber-400 bg-amber-500/10 border-amber-500/30' };
+  }
+  return { icon: Monitor, color: 'text-indigo-300 bg-indigo-500/10 border-indigo-500/20' };
+};
 
 export default function DashboardOverviewPage() {
   const [overview, setOverview] = useState<IDashboardOverview>({
@@ -51,21 +92,25 @@ export default function DashboardOverviewPage() {
   });
 
   const [employees, setEmployees] = useState<any[]>([]);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [departmentFilter, setDepartmentFilter] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
+  const [departmentFilter, setDepartmentFilter] = useState<string>('ALL');
+  const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
-  const [recentLiveEvents, setRecentLiveEvents] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [isLoading, setLoading] = useState(true);
 
-  // New Employee Modal State
+  // Live Stream Events Feed
+  const [recentLiveEvents, setRecentLiveEvents] = useState<
+    Array<{ id: any; name: string; status: string; app: string; time: string; isLiveNow?: boolean }>
+  >([]);
+
+  // Add Employee Modal
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [newEmail, setNewEmail] = useState('');
   const [newFirstName, setNewFirstName] = useState('');
   const [newLastName, setNewLastName] = useState('');
   const [newCode, setNewCode] = useState('');
-  const [newDept, setNewDept] = useState('Engineering');
-  const [newRole, setNewRole] = useState(UserRole.EMPLOYEE);
+  const [newDept, setNewDept] = useState('');
+  const [newRole, setNewRole] = useState<UserRole>(UserRole.EMPLOYEE);
   const [newTitle, setNewTitle] = useState('');
   const [modalError, setModalError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -75,7 +120,7 @@ export default function DashboardOverviewPage() {
       const [overviewRes, employeesRes, activityRes] = await Promise.all([
         api.get('/employees/overview'),
         api.get('/employees'),
-        api.get('/activity?limit=10')
+        api.get('/activity?limit=12')
       ]);
 
       if (overviewRes.data?.data) {
@@ -92,9 +137,13 @@ export default function DashboardOverviewPage() {
             name: evt.employeeId?.userId
               ? `${evt.employeeId.userId.firstName || ''} ${evt.employeeId.userId.lastName || ''}`.trim() || 'Employee'
               : 'Employee',
-            status: evt.type === 'IDLE_INTERVAL' ? 'IDLE' : 'ACTIVE',
+            status: evt.isLiveNow ? 'ACTIVE' : evt.type === 'IDLE_INTERVAL' ? 'IDLE' : 'ACTIVE',
             app: evt.applicationName || 'Active Workstation',
-            time: new Date(evt.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            time: new Date(evt.startedAt || evt.endedAt || Date.now()).toLocaleTimeString([], {
+              hour: '2-digit',
+              minute: '2-digit'
+            }),
+            isLiveNow: !!evt.isLiveNow
           }));
         setRecentLiveEvents(streamItems);
       }
@@ -118,7 +167,7 @@ export default function DashboardOverviewPage() {
               return {
                 ...emp,
                 currentStatus: data.status,
-                currentApplication: data.currentApplication,
+                currentApplication: data.currentApplication ?? emp.currentApplication,
                 lastActiveAt: data.lastActiveAt,
                 todayActiveSeconds: data.todayActiveSeconds ?? emp.todayActiveSeconds,
                 todayIdleSeconds: data.todayIdleSeconds ?? emp.todayIdleSeconds,
@@ -128,7 +177,7 @@ export default function DashboardOverviewPage() {
             return emp;
           });
 
-          // Compute overview stats instantly in-memory
+          // Recompute overview counts
           let active = 0;
           let idle = 0;
           let onBreak = 0;
@@ -149,16 +198,17 @@ export default function DashboardOverviewPage() {
           }));
 
           const targetEmp = prev.find((e) => e._id === data.employeeId);
-          if (targetEmp) {
+          if (targetEmp && data.currentApplication) {
             setRecentLiveEvents((rev) => [
               {
                 id: Date.now(),
-                name: `${targetEmp.userId?.firstName || 'Employee'} ${targetEmp.userId?.lastName || ''}`,
+                name: `${targetEmp.userId?.firstName || 'Employee'} ${targetEmp.userId?.lastName || ''}`.trim(),
                 status: data.status,
-                app: data.currentApplication || 'Active Workstation',
-                time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+                app: data.currentApplication,
+                time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                isLiveNow: data.status === 'ACTIVE'
               },
-              ...rev.slice(0, 9)
+              ...rev.filter((r) => r.name !== `${targetEmp.userId?.firstName || ''} ${targetEmp.userId?.lastName || ''}`.trim()).slice(0, 11)
             ]);
           }
 
@@ -176,9 +226,10 @@ export default function DashboardOverviewPage() {
                 name: `${target.userId?.firstName || 'Employee'} ${target.userId?.lastName || ''}`.trim(),
                 status: target.currentStatus || 'ACTIVE',
                 app: data.currentApplication,
-                time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+                time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                isLiveNow: true
               },
-              ...rev.slice(0, 9)
+              ...rev.slice(0, 11)
             ]);
           }
 
@@ -249,7 +300,7 @@ export default function DashboardOverviewPage() {
     const code = (emp.employeeCode || '').toLowerCase();
     const q = searchTerm.toLowerCase();
 
-    const matchesSearch = !q || fullName.includes(q) || email.includes(q) || code.includes(q);
+    const matchesSearch = fullName.includes(q) || email.includes(q) || code.includes(q);
     const matchesDept = departmentFilter === 'ALL' || emp.department === departmentFilter;
     const matchesStatus = statusFilter === 'ALL' || emp.currentStatus === statusFilter;
 
@@ -258,33 +309,43 @@ export default function DashboardOverviewPage() {
 
   const departments = Array.from(new Set(employees.map((e) => e.department).filter(Boolean)));
   const totalWorkingSeconds = overview.totalActiveSecondsToday + overview.totalIdleSecondsToday;
-  const activeRatio = totalWorkingSeconds > 0 ? Math.round((overview.totalActiveSecondsToday / totalWorkingSeconds) * 100) : 0;
+  const activeRatio =
+    totalWorkingSeconds > 0 ? Math.round((overview.totalActiveSecondsToday / totalWorkingSeconds) * 100) : 0;
+
+  // Currently actively focused employees
+  const currentlyActiveWorkers = employees.filter(
+    (e) => e.currentStatus === ActivityState.ACTIVE && e.currentApplication
+  );
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 bg-[#0B0F19] text-slate-100 selection:bg-indigo-600 selection:text-white">
+    <div className="flex-1 flex flex-col min-h-0 bg-[#090D16] text-slate-100 selection:bg-indigo-600 selection:text-white relative">
+      {/* Background ambient lighting */}
+      <div className="absolute top-0 left-1/4 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none -z-0" />
+      <div className="absolute top-40 right-1/4 w-96 h-96 bg-violet-500/5 rounded-full blur-3xl pointer-events-none -z-0" />
+
       <Header
-        title="Live Team Telemetry"
-        description="Real-time workplace presence, active/idle time, and current application focus."
+        title="Workforce Intelligence Hub"
+        description="Real-time employee presence, foreground workstation applications, and telemetry analytics."
         actions={
           <div className="flex items-center gap-2.5">
             <a
               href={getDesktopAgentDownloadUrl()}
               target="_blank"
               rel="noopener noreferrer"
-              className="hidden lg:inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 text-slate-200 border border-slate-700 text-xs font-semibold transition-all shadow-sm"
+              className="hidden lg:inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-indigo-300 border border-indigo-500/30 text-xs font-semibold transition-all shadow-md shadow-indigo-500/5 hover:border-indigo-500/60"
               title="Download Desktop Telemetry Agent"
             >
               <Download className="w-3.5 h-3.5 text-indigo-400" /> Desktop Agent (.exe)
             </a>
             <Link
               to="/dashboard/reports"
-              className="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 text-slate-200 border border-slate-700 text-xs font-semibold transition-all shadow-sm"
+              className="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900/80 hover:bg-slate-800 text-slate-200 border border-slate-700/80 text-xs font-semibold transition-all shadow-sm"
             >
               <TrendingUp className="w-3.5 h-3.5 text-slate-400" /> Export Reports
             </Link>
             <button
               onClick={() => setIsAddModalOpen(true)}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-lg shadow-indigo-600/30 transition-all hover:scale-105"
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-bold text-xs shadow-lg shadow-indigo-600/30 transition-all hover:scale-[1.02] active:scale-[0.98]"
             >
               <UserPlus className="w-3.5 h-3.5" /> Add Team Member
             </button>
@@ -292,12 +353,12 @@ export default function DashboardOverviewPage() {
         }
       />
 
-      <main className="p-4 sm:p-8 space-y-6 sm:space-y-8 flex-1 overflow-y-auto max-w-7xl mx-auto w-full">
-        {/* Executive KPI Grid */}
+      <main className="p-4 sm:p-8 space-y-6 sm:space-y-8 flex-1 overflow-y-auto max-w-7xl mx-auto w-full z-10">
+        {/* Executive KPI Metrics */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
           {/* Card 1: Active Workforce Pulse */}
-          <div className="relative overflow-hidden bg-slate-900/60 backdrop-blur-xl border border-slate-800/80 rounded-2xl p-5 shadow-xl transition-all hover:border-emerald-500/40 group">
-            <div className="absolute -right-6 -bottom-6 w-24 h-24 rounded-full bg-emerald-500/10 blur-xl pointer-events-none group-hover:scale-150 transition-transform duration-500" />
+          <div className="relative overflow-hidden bg-slate-900/70 backdrop-blur-xl border border-slate-800/80 rounded-2xl p-5 shadow-xl transition-all hover:border-emerald-500/40 group">
+            <div className="absolute -right-6 -bottom-6 w-28 h-28 rounded-full bg-emerald-500/10 blur-2xl pointer-events-none group-hover:scale-150 transition-transform duration-500" />
             <div className="flex items-start justify-between relative z-10">
               <div>
                 <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">
@@ -308,56 +369,56 @@ export default function DashboardOverviewPage() {
                     {overview.activeNow}
                   </h3>
                   <span className="text-xs font-semibold text-slate-400">
-                    / {overview.totalEmployees} Team
+                    / {overview.totalEmployees} Total
                   </span>
                 </div>
-                <div className="mt-2 flex items-center gap-1.5">
-                  <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-400 bg-emerald-500/15 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                <div className="mt-2.5 flex items-center gap-2">
+                  <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-400 bg-emerald-500/15 px-2.5 py-0.5 rounded-full border border-emerald-500/30 shadow-sm shadow-emerald-500/10">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                     {activeRatio}% Productive
                   </span>
-                  <span className="text-[11px] text-slate-400">live ratio</span>
+                  <span className="text-[11px] text-slate-500 font-medium">live efficiency</span>
                 </div>
               </div>
-              <div className="w-11 h-11 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shadow-sm shrink-0">
-                <Activity className="w-5 h-5" />
+              <div className="w-12 h-12 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shadow-inner shrink-0 group-hover:scale-105 transition-transform">
+                <Activity className="w-6 h-6" />
               </div>
             </div>
           </div>
 
-          {/* Card 2: Presence Breakdown */}
-          <div className="relative overflow-hidden bg-slate-900/60 backdrop-blur-xl border border-slate-800/80 rounded-2xl p-5 shadow-xl transition-all hover:border-indigo-500/40 group">
-            <div className="absolute -right-6 -bottom-6 w-24 h-24 rounded-full bg-indigo-500/10 blur-xl pointer-events-none group-hover:scale-150 transition-transform duration-500" />
+          {/* Card 2: Presence Matrix */}
+          <div className="relative overflow-hidden bg-slate-900/70 backdrop-blur-xl border border-slate-800/80 rounded-2xl p-5 shadow-xl transition-all hover:border-indigo-500/40 group">
+            <div className="absolute -right-6 -bottom-6 w-28 h-28 rounded-full bg-indigo-500/10 blur-2xl pointer-events-none group-hover:scale-150 transition-transform duration-500" />
             <div className="flex items-start justify-between relative z-10">
               <div className="w-full">
                 <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">
-                  Live Presence Matrix
+                  Presence Distribution
                 </span>
                 <div className="mt-3 grid grid-cols-4 gap-2 text-center">
-                  <div className="bg-slate-950/60 p-2 rounded-xl border border-emerald-500/20">
-                    <span className="text-xs font-bold text-emerald-400 block">{overview.activeNow}</span>
+                  <div className="bg-slate-950/70 p-2 rounded-xl border border-emerald-500/30">
+                    <span className="text-sm font-extrabold text-emerald-400 block">{overview.activeNow}</span>
                     <span className="text-[9px] uppercase tracking-wider text-slate-400 font-semibold">Active</span>
                   </div>
-                  <div className="bg-slate-950/60 p-2 rounded-xl border border-amber-500/20">
-                    <span className="text-xs font-bold text-amber-400 block">{overview.idleNow}</span>
+                  <div className="bg-slate-950/70 p-2 rounded-xl border border-amber-500/30">
+                    <span className="text-sm font-extrabold text-amber-400 block">{overview.idleNow}</span>
                     <span className="text-[9px] uppercase tracking-wider text-slate-400 font-semibold">Idle</span>
                   </div>
-                  <div className="bg-slate-950/60 p-2 rounded-xl border border-cyan-500/20">
-                    <span className="text-xs font-bold text-cyan-400 block">{overview.onBreakNow}</span>
+                  <div className="bg-slate-950/70 p-2 rounded-xl border border-cyan-500/30">
+                    <span className="text-sm font-extrabold text-cyan-400 block">{overview.onBreakNow}</span>
                     <span className="text-[9px] uppercase tracking-wider text-slate-400 font-semibold">Break</span>
                   </div>
-                  <div className="bg-slate-950/60 p-2 rounded-xl border border-slate-700/40">
-                    <span className="text-xs font-bold text-slate-400 block">{overview.offlineNow}</span>
-                    <span className="text-[9px] uppercase tracking-wider text-slate-400 font-semibold">Offline</span>
+                  <div className="bg-slate-950/70 p-2 rounded-xl border border-slate-800">
+                    <span className="text-sm font-extrabold text-slate-400 block">{overview.offlineNow}</span>
+                    <span className="text-[9px] uppercase tracking-wider text-slate-500 font-semibold">Offline</span>
                   </div>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Card 3: Today's Accumulated Hours */}
-          <div className="relative overflow-hidden bg-slate-900/60 backdrop-blur-xl border border-slate-800/80 rounded-2xl p-5 shadow-xl transition-all hover:border-indigo-500/40 group">
-            <div className="absolute -right-6 -bottom-6 w-24 h-24 rounded-full bg-indigo-500/10 blur-xl pointer-events-none group-hover:scale-150 transition-transform duration-500" />
+          {/* Card 3: Accumulated Active Hours */}
+          <div className="relative overflow-hidden bg-slate-900/70 backdrop-blur-xl border border-slate-800/80 rounded-2xl p-5 shadow-xl transition-all hover:border-indigo-500/40 group">
+            <div className="absolute -right-6 -bottom-6 w-28 h-28 rounded-full bg-indigo-500/10 blur-2xl pointer-events-none group-hover:scale-150 transition-transform duration-500" />
             <div className="flex items-start justify-between relative z-10">
               <div>
                 <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">
@@ -366,82 +427,157 @@ export default function DashboardOverviewPage() {
                 <h3 className="text-3xl font-black text-white font-sans tracking-tight mt-1.5">
                   {formatDuration(overview.totalActiveSecondsToday)}
                 </h3>
-                <div className="mt-2 flex items-center gap-2 text-[11px] text-slate-400 font-medium">
+                <div className="mt-2.5 flex items-center gap-2 text-[11px] font-medium">
                   <span className="text-amber-400 font-semibold">Idle: {formatDuration(overview.totalIdleSecondsToday)}</span>
-                  <span>•</span>
+                  <span className="text-slate-600">•</span>
                   <span className="text-cyan-400 font-semibold">Break: {formatDuration(overview.totalBreakSecondsToday)}</span>
                 </div>
               </div>
-              <div className="w-11 h-11 rounded-xl bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shadow-sm shrink-0">
-                <Zap className="w-5 h-5" />
+              <div className="w-12 h-12 rounded-xl bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shadow-inner shrink-0 group-hover:scale-105 transition-transform">
+                <Zap className="w-6 h-6" />
               </div>
             </div>
           </div>
 
-          {/* Card 4: Desktop Agent Health & Deploy */}
-          <div className="relative overflow-hidden bg-gradient-to-br from-indigo-950/60 via-slate-900/70 to-slate-900/60 backdrop-blur-xl border border-indigo-500/30 rounded-2xl p-5 shadow-xl transition-all hover:border-indigo-500/50 group">
+          {/* Card 4: Desktop Agent Hub */}
+          <div className="relative overflow-hidden bg-gradient-to-br from-indigo-950/60 via-slate-900/80 to-slate-950/80 backdrop-blur-xl border border-indigo-500/30 rounded-2xl p-5 shadow-xl transition-all hover:border-indigo-500/60 group">
             <div className="flex items-start justify-between relative z-10">
               <div>
                 <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-300 block">
                   Workstation Agent Hub
                 </span>
-                <p className="text-xs text-slate-300 mt-1 leading-relaxed">
-                  HighP Desktop Agent v1.0.0
+                <p className="text-xs text-slate-300 mt-1 font-medium">
+                  Native Windows Telemetry v1.0.0
                 </p>
-                <div className="mt-3 flex items-center gap-2">
+                <div className="mt-3 flex items-center gap-2.5">
                   <a
                     href={getDesktopAgentDownloadUrl()}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-md shadow-indigo-600/30 transition-all"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-md shadow-indigo-600/30 transition-all hover:scale-105"
                   >
                     <Download className="w-3.5 h-3.5" /> Download (.exe)
                   </a>
-                  <span className="text-[10px] text-emerald-400 font-semibold flex items-center gap-1">
+                  <span className="text-[10px] text-emerald-400 font-bold flex items-center gap-1">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-                    1-Click Silent
+                    Auto Win32
                   </span>
                 </div>
               </div>
-              <div className="w-11 h-11 rounded-xl bg-indigo-600/20 border border-indigo-500/40 flex items-center justify-center text-indigo-300 shadow-sm shrink-0">
-                <Laptop className="w-5 h-5" />
+              <div className="w-12 h-12 rounded-xl bg-indigo-600/20 border border-indigo-500/40 flex items-center justify-center text-indigo-300 shadow-inner shrink-0 group-hover:scale-105 transition-transform">
+                <Laptop className="w-6 h-6" />
               </div>
             </div>
           </div>
         </div>
 
-        {/* Live Activity Radar & Real-Time Stream */}
-        {recentLiveEvents.length > 0 && (
-          <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 backdrop-blur-md shadow-lg flex items-center gap-3 overflow-hidden animate-in fade-in">
-            <div className="flex items-center gap-2 shrink-0 bg-emerald-500/10 border border-emerald-500/30 px-2.5 py-1 rounded-full text-emerald-400 text-xs font-bold">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              LIVE STREAM
+        {/* PROMINENT LIVE TELEMETRY RADAR & CURRENT APPLICATION STREAM */}
+        <div className="bg-slate-900/80 border border-slate-800/90 rounded-2xl p-5 backdrop-blur-2xl shadow-2xl space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-800/80">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 bg-emerald-500/15 border border-emerald-500/30 px-3 py-1 rounded-full text-emerald-400 text-xs font-black tracking-wide">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                LIVE APPLICATION FOCUS RADAR
+              </div>
+              <span className="text-xs text-slate-400 hidden sm:inline">
+                Currently tracking active software windows across team workstations
+              </span>
             </div>
-            <div className="flex-1 min-w-0 overflow-x-auto whitespace-nowrap text-xs text-slate-300 flex items-center gap-4">
-              {recentLiveEvents.slice(0, 3).map((ev) => (
-                <span key={ev.id} className="inline-flex items-center gap-1.5 font-medium">
-                  <strong className="text-white">{ev.name}</strong>
-                  <span className="text-slate-400">switched to</span>
-                  <code className="bg-slate-800 text-indigo-300 px-1.5 py-0.5 rounded text-[11px] font-mono">
-                    {ev.app}
-                  </code>
-                  <span className="text-slate-500 text-[10px]">({ev.time})</span>
-                </span>
-              ))}
-            </div>
+            <span className="text-xs font-bold text-indigo-400 bg-indigo-500/10 border border-indigo-500/20 px-2.5 py-1 rounded-lg">
+              {currentlyActiveWorkers.length} Active Workstations
+            </span>
           </div>
-        )}
 
-        {/* Control Filter Bar */}
+          {/* Currently Working Spotlight Grid */}
+          {currentlyActiveWorkers.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+              {currentlyActiveWorkers.map((worker) => {
+                const u = worker.userId;
+                const workerName = u ? `${u.firstName} ${u.lastName}` : 'Employee';
+                const visuals = getAppVisuals(worker.currentApplication);
+                const Icon = visuals.icon;
+
+                return (
+                  <div
+                    key={worker._id}
+                    className="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800/80 hover:border-indigo-500/40 transition-all flex items-center justify-between group shadow-md"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-950 to-indigo-800 border border-indigo-500/30 flex items-center justify-center text-white font-bold text-xs ring-2 ring-emerald-500/60 shrink-0">
+                        {workerName.charAt(0)}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-bold text-white text-xs truncate group-hover:text-indigo-300 transition-colors">
+                          {workerName}
+                        </p>
+                        <p className="text-[10px] text-slate-400 truncate">
+                          {worker.employeeCode} • {worker.department}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col items-end gap-1 shrink-0">
+                      <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-bold ${visuals.color}`}>
+                        <Icon className="w-3.5 h-3.5" />
+                        <span className="truncate max-w-[130px]">{worker.currentApplication}</span>
+                      </div>
+                      <span className="text-[10px] font-semibold text-emerald-400 flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                        Live in app
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="p-6 rounded-xl bg-slate-950/50 border border-slate-800/60 text-center space-y-2">
+              <Monitor className="w-8 h-8 text-slate-600 mx-auto" />
+              <p className="text-xs font-semibold text-slate-300">
+                No active workstation application detected right now.
+              </p>
+              <p className="text-[11px] text-slate-500 max-w-md mx-auto">
+                When employees start work on their desktop agent or web portal, their real-time application focus streams directly here.
+              </p>
+            </div>
+          )}
+
+          {/* Recent Live Switch Feed Bar */}
+          {recentLiveEvents.length > 0 && (
+            <div className="pt-2 border-t border-slate-800/60 flex items-center gap-3 overflow-x-auto text-xs text-slate-400 whitespace-nowrap">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 shrink-0">
+                Recent Switches:
+              </span>
+              {recentLiveEvents.slice(0, 4).map((ev) => {
+                const visuals = getAppVisuals(ev.app);
+                const Icon = visuals.icon;
+                return (
+                  <span
+                    key={ev.id}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-950/60 border border-slate-800 text-[11px] font-medium"
+                  >
+                    <strong className="text-white">{ev.name}</strong>
+                    <span className="text-slate-500">→</span>
+                    <Icon className="w-3 h-3 text-indigo-400" />
+                    <span className="text-indigo-300 font-semibold">{ev.app}</span>
+                    <span className="text-slate-500 text-[10px]">({ev.time})</span>
+                  </span>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Filter and View Control Bar */}
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-slate-900/70 border border-slate-800/80 rounded-2xl p-4 shadow-xl backdrop-blur-xl">
           {/* Status Filter Tabs */}
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 lg:pb-0">
             {[
               { label: 'All Team', value: 'ALL', count: overview.totalEmployees },
-              { label: 'Active', value: ActivityState.ACTIVE, count: overview.activeNow, color: 'text-emerald-400' },
-              { label: 'Idle', value: ActivityState.IDLE, count: overview.idleNow, color: 'text-amber-400' },
-              { label: 'On Break', value: ActivityState.BREAK, count: overview.onBreakNow, color: 'text-cyan-400' },
-              { label: 'Offline', value: ActivityState.OFFLINE, count: overview.offlineNow, color: 'text-slate-400' }
+              { label: 'Active', value: ActivityState.ACTIVE, count: overview.activeNow },
+              { label: 'Idle', value: ActivityState.IDLE, count: overview.idleNow },
+              { label: 'On Break', value: ActivityState.BREAK, count: overview.onBreakNow },
+              { label: 'Offline', value: ActivityState.OFFLINE, count: overview.offlineNow }
             ].map((tab) => (
               <button
                 key={tab.value}
@@ -466,7 +602,7 @@ export default function DashboardOverviewPage() {
             ))}
           </div>
 
-          {/* Search, Dept Filter, View Switcher */}
+          {/* Search, Dept Filter, View Mode */}
           <div className="flex items-center gap-3">
             <div className="relative w-full sm:w-60">
               <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -517,7 +653,7 @@ export default function DashboardOverviewPage() {
 
         {/* View Mode: Table or Grid Cards */}
         {viewMode === 'table' ? (
-          <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl shadow-xl overflow-hidden backdrop-blur-xl">
+          <div className="bg-slate-900/70 border border-slate-800/80 rounded-2xl shadow-xl overflow-hidden backdrop-blur-xl">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead className="bg-slate-950/80 text-slate-400 font-bold uppercase tracking-wider border-b border-slate-800 text-[11px]">
@@ -525,7 +661,7 @@ export default function DashboardOverviewPage() {
                     <th className="px-6 py-4">Employee</th>
                     <th className="px-6 py-4">Live Status</th>
                     <th className="px-6 py-4">Tracking Source</th>
-                    <th className="px-6 py-4">Foreground Application</th>
+                    <th className="px-6 py-4">Active Application</th>
                     <th className="px-6 py-4">Active Today</th>
                     <th className="px-6 py-4">Idle Time</th>
                     <th className="px-6 py-4">Break Time</th>
@@ -557,6 +693,9 @@ export default function DashboardOverviewPage() {
                           : emp.currentStatus === ActivityState.BREAK
                           ? 'ring-2 ring-cyan-500/80'
                           : 'ring-1 ring-slate-700';
+
+                      const visuals = getAppVisuals(emp.currentApplication);
+                      const Icon = visuals.icon;
 
                       return (
                         <tr key={emp._id} className="hover:bg-slate-800/40 transition-colors group">
@@ -591,25 +730,21 @@ export default function DashboardOverviewPage() {
                               </span>
                             ) : (
                               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">
-                                <Radio className="w-3.5 h-3.5 text-amber-400" /> WEB PRESENCE
+                                <Radio className="w-3.5 h-3.5 text-amber-400" /> WEB WORKSPACE
                               </span>
                             )}
                           </td>
                           <td className="px-6 py-4">
-                            <div className="flex items-center gap-2">
-                              <div className="w-6 h-6 rounded-md bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-400">
-                                <Monitor className="w-3.5 h-3.5" />
+                            {emp.currentStatus === ActivityState.OFFLINE ? (
+                              <span className="text-slate-500 font-normal">None (Offline)</span>
+                            ) : emp.currentApplication ? (
+                              <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-semibold ${visuals.color}`}>
+                                <Icon className="w-3.5 h-3.5 shrink-0" />
+                                <span className="truncate max-w-[170px]">{emp.currentApplication}</span>
                               </div>
-                              <span className="font-semibold text-slate-200 truncate max-w-[180px]">
-                                {emp.currentStatus === ActivityState.OFFLINE
-                                  ? (emp.currentApplication ? (
-                                      <span className="text-slate-400 font-normal">Last: {emp.currentApplication}</span>
-                                    ) : (
-                                      '—'
-                                    ))
-                                  : emp.currentApplication || 'No active application'}
-                              </span>
-                            </div>
+                            ) : (
+                              <span className="text-slate-500">No active application</span>
+                            )}
                           </td>
                           <td className="px-6 py-4 font-bold text-emerald-400 font-mono">
                             {formatDuration(emp.todayActiveSeconds)}
@@ -645,15 +780,17 @@ export default function DashboardOverviewPage() {
               const name = user ? `${user.firstName} ${user.lastName}` : 'Employee';
               const totalToday = (emp.todayActiveSeconds || 0) + (emp.todayIdleSeconds || 0);
               const activePct = totalToday > 0 ? Math.round((emp.todayActiveSeconds / totalToday) * 100) : 0;
+              const visuals = getAppVisuals(emp.currentApplication);
+              const Icon = visuals.icon;
 
               return (
                 <div
                   key={emp._id}
-                  className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-5 shadow-xl hover:border-indigo-500/40 transition-all space-y-4 group hover:-translate-y-0.5 backdrop-blur-xl"
+                  className="bg-slate-900/70 border border-slate-800/80 rounded-2xl p-5 shadow-xl hover:border-indigo-500/40 transition-all flex flex-col justify-between gap-4 group backdrop-blur-xl"
                 >
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-start justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-950 to-indigo-800 text-indigo-200 font-black flex items-center justify-center text-sm border border-indigo-500/30">
+                      <div className="w-11 h-11 rounded-xl bg-gradient-to-tr from-indigo-950 to-indigo-800 text-indigo-200 font-black flex items-center justify-center text-sm border border-indigo-500/30">
                         {name.charAt(0)}
                       </div>
                       <div>
@@ -667,34 +804,30 @@ export default function DashboardOverviewPage() {
                     </div>
                     <div className="flex flex-col items-end gap-1.5">
                       <StatusBadge status={emp.currentStatus} />
-                      {emp.currentStatus === ActivityState.OFFLINE ? (
-                        <span className="text-[10px] font-bold text-slate-500 bg-slate-800/60 px-2 py-0.5 rounded-md border border-slate-700/50">
-                          OFFLINE
-                        </span>
-                      ) : emp.currentDeviceId ? (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-indigo-300 bg-indigo-500/10 px-2 py-0.5 rounded-md border border-indigo-500/20">
-                          <Laptop className="w-3 h-3 text-indigo-400" /> DESKTOP
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded-md border border-amber-500/20">
-                          <Radio className="w-3 h-3 text-amber-400" /> WEB
-                        </span>
-                      )}
                     </div>
                   </div>
 
                   {/* Current Active App Spotlight */}
                   <div className="p-3 bg-slate-950/70 rounded-xl border border-slate-800 flex items-center justify-between">
                     <span className="text-[11px] font-semibold text-slate-400">Current App Focus</span>
-                    <span className="font-bold text-xs text-indigo-300 truncate max-w-[150px]">
-                      {emp.currentStatus === ActivityState.OFFLINE ? 'None (Offline)' : emp.currentApplication || 'No active application'}
-                    </span>
+                    {emp.currentStatus === ActivityState.OFFLINE ? (
+                      <span className="text-xs font-semibold text-slate-500">None (Offline)</span>
+                    ) : emp.currentApplication ? (
+                      <div className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg border text-xs font-bold ${visuals.color}`}>
+                        <Icon className="w-3 h-3" />
+                        <span className="truncate max-w-[130px]">{emp.currentApplication}</span>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-slate-500">No active application</span>
+                    )}
                   </div>
 
                   {/* Productivity Ratio Bar */}
                   <div className="space-y-1.5">
                     <div className="flex justify-between text-xs font-semibold">
-                      <span className="text-slate-400">Active Work: <strong className="text-emerald-400 font-mono">{formatDuration(emp.todayActiveSeconds)}</strong></span>
+                      <span className="text-slate-400">
+                        Active Work: <strong className="text-emerald-400 font-mono">{formatDuration(emp.todayActiveSeconds)}</strong>
+                      </span>
                       <span className="text-emerald-400">{activePct}%</span>
                     </div>
                     <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">

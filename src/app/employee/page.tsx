@@ -180,6 +180,17 @@ export default function EmployeeWorkspacePage() {
     return () => clearInterval(ticker);
   }, [isWorking]);
 
+const getBrowserAppName = (): string => {
+  if (typeof window === 'undefined') return 'Web Browser';
+  const ua = navigator.userAgent;
+  if (ua.includes('Edg/')) return 'Microsoft Edge';
+  if ((navigator as any).brave || ua.includes('Brave')) return 'Brave Browser';
+  if (ua.includes('Chrome/')) return 'Google Chrome';
+  if (ua.includes('Firefox/')) return 'Mozilla Firefox';
+  if (ua.includes('Safari/')) return 'Apple Safari';
+  return 'Web Browser';
+};
+
   // Periodic 15-Second Attendance Heartbeat to Backend
   const sendHeartbeat = useCallback(
     async (overrideStatus?: ActivityState, durationSec = 15) => {
@@ -193,9 +204,11 @@ export default function EmployeeWorkspacePage() {
             ? ActivityState.IDLE
             : ActivityState.ACTIVE);
         const idleTimeSeconds = Math.floor((Date.now() - lastActivityRef.current) / 1000);
+        const browserApp = getBrowserAppName();
 
         await api.post('/attendance/heartbeat', {
           status: effectiveStatus,
+          currentApplication: browserApp,
           recentDurationSeconds: durationSec,
           idleSeconds: idleTimeSeconds
         });
@@ -214,12 +227,36 @@ export default function EmployeeWorkspacePage() {
     return () => clearInterval(interval);
   }, [isWorking, sendHeartbeat]);
 
+  // Tab focus re-engagement listener
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && isWorkingRef.current) {
+        lastActivityRef.current = Date.now();
+        setIsIdle(false);
+        sendHeartbeat(ActivityState.ACTIVE, 5);
+        fetchMyData();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [sendHeartbeat, fetchMyData]);
+
   const handleStartWork = async () => {
     setLoading(true);
     try {
-      await api.post('/attendance/start', {});
+      const browserApp = getBrowserAppName();
+      const startRes = await api.post('/attendance/start', {});
+      if (startRes.data?.data) {
+        setCurrentProfile((prev: any) => ({
+          ...prev,
+          currentSessionId: startRes.data.data._id,
+          currentStatus: ActivityState.ACTIVE,
+          currentApplication: browserApp
+        }));
+      }
       await api.post('/attendance/heartbeat', {
         status: ActivityState.ACTIVE,
+        currentApplication: browserApp,
         recentDurationSeconds: 1,
         idleSeconds: 0
       });
