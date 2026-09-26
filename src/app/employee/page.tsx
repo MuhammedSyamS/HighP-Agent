@@ -41,6 +41,14 @@ export default function EmployeeWorkspacePage() {
   const [showInstallBanner, setShowInstallBanner] = useState(true);
   const [autoDownloaded, setAutoDownloaded] = useState(false);
 
+  // Real-Time Live Tracking Engine State
+  const [liveActiveSeconds, setLiveActiveSeconds] = useState(0);
+  const [liveIdleSeconds, setLiveIdleSeconds] = useState(0);
+  const [liveBreakSeconds, setLiveBreakSeconds] = useState(0);
+  const [isIdle, setIsIdle] = useState(false);
+  const [currentAppFocus, setCurrentAppFocus] = useState('HighP Web Workspace');
+  const lastActivityRef = React.useRef(Date.now());
+
   const triggerAgentDownload = useCallback(() => {
     try {
       const link = document.createElement('a');
@@ -62,13 +70,8 @@ export default function EmployeeWorkspacePage() {
     const hasInstalled = localStorage.getItem('highp_agent_installed');
     if (hasInstalled === 'true') {
       setShowInstallBanner(false);
-    } else {
-      const timer = setTimeout(() => {
-        triggerAgentDownload();
-      }, 1500);
-      return () => clearTimeout(timer);
     }
-  }, [triggerAgentDownload]);
+  }, []);
 
   const handleDismissInstall = () => {
     localStorage.setItem('highp_agent_installed', 'true');
@@ -85,7 +88,14 @@ export default function EmployeeWorkspacePage() {
         api.get(`/applications/usage/${profile._id}?date=${today}`)
       ]);
 
-      if (empRes.data?.data?.profile) setCurrentProfile(empRes.data.data.profile);
+      if (empRes.data?.data?.profile) {
+        const p = empRes.data.data.profile;
+        setCurrentProfile(p);
+        setLiveActiveSeconds((s) => Math.max(s, p.todayActiveSeconds || 0));
+        setLiveIdleSeconds((s) => Math.max(s, p.todayIdleSeconds || 0));
+        setLiveBreakSeconds((s) => Math.max(s, p.todayBreakSeconds || 0));
+        if (p.currentApplication) setCurrentAppFocus(p.currentApplication);
+      }
       if (timelineRes.data?.data?.events) setTimelineEvents(timelineRes.data.data.events);
       if (appRes.data?.data?.applications) setAppUsages(appRes.data.data.applications);
     } catch (err) {
@@ -101,10 +111,124 @@ export default function EmployeeWorkspacePage() {
     }
   }, [profile?._id, fetchMyData]);
 
+  const isWorking = !!currentProfile?.currentSessionId;
+  const isOnBreak = currentProfile?.currentStatus === ActivityState.BREAK;
+  const todayStr = new Date().toISOString().slice(0, 10);
+
+  // Track User Interaction for Idle Detection
+  useEffect(() => {
+    const handleUserActivity = () => {
+      lastActivityRef.current = Date.now();
+      if (isIdle) {
+        setIsIdle(false);
+      }
+    };
+
+    window.addEventListener('mousemove', handleUserActivity);
+    window.addEventListener('mousedown', handleUserActivity);
+    window.addEventListener('keydown', handleUserActivity);
+    window.addEventListener('touchstart', handleUserActivity);
+    window.addEventListener('scroll', handleUserActivity);
+
+    return () => {
+      window.removeEventListener('mousemove', handleUserActivity);
+      window.removeEventListener('mousedown', handleUserActivity);
+      window.removeEventListener('keydown', handleUserActivity);
+      window.removeEventListener('touchstart', handleUserActivity);
+      window.removeEventListener('scroll', handleUserActivity);
+    };
+  }, []);
+
+  const isWorkingRef = React.useRef(isWorking);
+  const isOnBreakRef = React.useRef(isOnBreak);
+  const isIdleRef = React.useRef(isIdle);
+
+  useEffect(() => {
+    isWorkingRef.current = isWorking;
+  }, [isWorking]);
+
+  useEffect(() => {
+    isOnBreakRef.current = isOnBreak;
+  }, [isOnBreak]);
+
+  useEffect(() => {
+    isIdleRef.current = isIdle;
+  }, [isIdle]);
+
+  // 1-Second Live Local Ticker
+  useEffect(() => {
+    if (!isWorking) return;
+
+    const ticker = setInterval(() => {
+      // 5-minute inactivity threshold
+      const idleMs = Date.now() - lastActivityRef.current;
+      const nowIdle = idleMs > 5 * 60 * 1000;
+      if (nowIdle !== isIdleRef.current) {
+        isIdleRef.current = nowIdle;
+        setIsIdle(nowIdle);
+      }
+
+      if (isOnBreakRef.current) {
+        setLiveBreakSeconds((s) => s + 1);
+      } else if (nowIdle) {
+        setLiveIdleSeconds((s) => s + 1);
+      } else {
+        setLiveActiveSeconds((s) => s + 1);
+      }
+    }, 1000);
+
+    return () => clearInterval(ticker);
+  }, [isWorking]);
+
+  // Periodic 15-Second Attendance Heartbeat to Backend
+  const sendHeartbeat = useCallback(
+    async (overrideStatus?: ActivityState, durationSec = 15) => {
+      if (!isWorkingRef.current || !profile?._id) return;
+      try {
+        const effectiveStatus =
+          overrideStatus ||
+          (isOnBreakRef.current
+            ? ActivityState.BREAK
+            : isIdleRef.current
+            ? ActivityState.IDLE
+            : ActivityState.ACTIVE);
+        const idleTimeSeconds = Math.floor((Date.now() - lastActivityRef.current) / 1000);
+        const appName = document.title || 'HighP Web Workspace';
+
+        await api.post('/attendance/heartbeat', {
+          status: effectiveStatus,
+          currentApplication: appName,
+          recentDurationSeconds: durationSec,
+          idleSeconds: idleTimeSeconds
+        });
+        setCurrentAppFocus(appName);
+      } catch (err) {
+        console.warn('[Tracking] Heartbeat sync warning:', err);
+      }
+    },
+    [profile?._id]
+  );
+
+  useEffect(() => {
+    if (!isWorking) return;
+    const interval = setInterval(() => {
+      sendHeartbeat(undefined, 15);
+    }, 15000);
+    return () => clearInterval(interval);
+  }, [isWorking, sendHeartbeat]);
+
   const handleStartWork = async () => {
     setLoading(true);
     try {
       await api.post('/attendance/start', {});
+      await api.post('/attendance/heartbeat', {
+        status: ActivityState.ACTIVE,
+        currentApplication: document.title || 'HighP Web Workspace',
+        recentDurationSeconds: 1,
+        idleSeconds: 0
+      });
+      lastActivityRef.current = Date.now();
+      setIsIdle(false);
       await fetchMyData();
       await refreshAuth();
     } catch (err) {
@@ -118,6 +242,7 @@ export default function EmployeeWorkspacePage() {
     if (!confirm('Are you sure you want to end your work session?')) return;
     setLoading(true);
     try {
+      await sendHeartbeat(ActivityState.OFFLINE, 1);
       await api.post('/attendance/end', {});
       await fetchMyData();
       await refreshAuth();
@@ -132,6 +257,7 @@ export default function EmployeeWorkspacePage() {
     setLoading(true);
     try {
       await api.post('/breaks/start', { reason: breakReason });
+      await sendHeartbeat(ActivityState.BREAK, 1);
       await fetchMyData();
       await refreshAuth();
     } catch (err) {
@@ -145,6 +271,7 @@ export default function EmployeeWorkspacePage() {
     setLoading(true);
     try {
       await api.post('/breaks/end', {});
+      await sendHeartbeat(ActivityState.ACTIVE, 1);
       await fetchMyData();
       await refreshAuth();
     } catch (err) {
@@ -153,10 +280,6 @@ export default function EmployeeWorkspacePage() {
       setLoading(false);
     }
   };
-
-  const isWorking = currentProfile?.currentSessionId;
-  const isOnBreak = currentProfile?.currentStatus === ActivityState.BREAK;
-  const todayStr = new Date().toISOString().slice(0, 10);
 
   if (isLoading || !mounted) {
     return (
@@ -191,7 +314,18 @@ export default function EmployeeWorkspacePage() {
         </div>
 
         <div className="flex items-center gap-2 sm:gap-3">
-          <StatusBadge status={currentProfile?.currentStatus || ActivityState.OFFLINE} size="sm" />
+          <StatusBadge
+            status={
+              !isWorking
+                ? ActivityState.OFFLINE
+                : isOnBreak
+                ? ActivityState.BREAK
+                : isIdle
+                ? ActivityState.IDLE
+                : ActivityState.ACTIVE
+            }
+            size="sm"
+          />
           <button
             onClick={logout}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-rose-400 hover:bg-rose-500/10 border border-transparent hover:border-rose-500/20 transition-all"
@@ -341,25 +475,31 @@ export default function EmployeeWorkspacePage() {
             <div className="bg-slate-950/70 p-4 rounded-2xl border border-slate-800/80 shadow-md">
               <span className="text-[11px] font-bold text-slate-400 block uppercase">Active Work</span>
               <span className="text-2xl font-black text-emerald-400 mt-1 block tracking-tight">
-                {formatDuration(currentProfile?.todayActiveSeconds || 0)}
+                {formatDuration(liveActiveSeconds)}
               </span>
             </div>
             <div className="bg-slate-950/70 p-4 rounded-2xl border border-slate-800/80 shadow-md">
               <span className="text-[11px] font-bold text-slate-400 block uppercase">Idle Time</span>
               <span className="text-2xl font-black text-amber-400 mt-1 block tracking-tight">
-                {formatDuration(currentProfile?.todayIdleSeconds || 0)}
+                {formatDuration(liveIdleSeconds)}
               </span>
             </div>
             <div className="bg-slate-950/70 p-4 rounded-2xl border border-slate-800/80 shadow-md">
               <span className="text-[11px] font-bold text-slate-400 block uppercase">Break Time</span>
               <span className="text-2xl font-black text-cyan-400 mt-1 block tracking-tight">
-                {formatDuration(currentProfile?.todayBreakSeconds || 0)}
+                {formatDuration(liveBreakSeconds)}
               </span>
             </div>
             <div className="bg-slate-950/70 p-4 rounded-2xl border border-slate-800/80 shadow-md">
               <span className="text-[11px] font-bold text-slate-400 block uppercase">Current Focus</span>
               <span className="text-sm font-bold text-white mt-1.5 block truncate">
-                {currentProfile?.currentStatus === ActivityState.OFFLINE ? 'None' : currentProfile?.currentApplication || 'Desktop'}
+                {!isWorking
+                  ? 'None'
+                  : isOnBreak
+                  ? 'On Break'
+                  : isIdle
+                  ? 'Idle / Inactive'
+                  : currentAppFocus}
               </span>
             </div>
           </div>
