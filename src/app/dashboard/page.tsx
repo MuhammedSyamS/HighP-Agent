@@ -100,7 +100,16 @@ export default function DashboardOverviewPage() {
 
   // Live Stream Events Feed
   const [recentLiveEvents, setRecentLiveEvents] = useState<
-    Array<{ id: any; name: string; status: string; app: string; time: string; isLiveNow?: boolean }>
+    Array<{
+      id: any;
+      name: string;
+      status: string;
+      app: string;
+      time: string;
+      isLiveNow?: boolean;
+      durationSeconds?: number;
+      employeeCode?: string;
+    }>
   >([]);
 
   // Add Employee Modal
@@ -137,8 +146,10 @@ export default function DashboardOverviewPage() {
             name: evt.employeeId?.userId
               ? `${evt.employeeId.userId.firstName || ''} ${evt.employeeId.userId.lastName || ''}`.trim() || 'Employee'
               : 'Employee',
+            employeeCode: evt.employeeId?.employeeCode || '',
             status: evt.isLiveNow ? 'ACTIVE' : evt.type === 'IDLE_INTERVAL' ? 'IDLE' : 'ACTIVE',
             app: evt.applicationName || 'Active Workstation',
+            durationSeconds: evt.todayTotalSeconds || evt.durationSeconds || 0,
             time: new Date(evt.startedAt || evt.endedAt || Date.now()).toLocaleTimeString([], {
               hour: '2-digit',
               minute: '2-digit'
@@ -199,16 +210,19 @@ export default function DashboardOverviewPage() {
 
           const targetEmp = prev.find((e) => e._id === data.employeeId);
           if (targetEmp && data.currentApplication) {
+            const empName = `${targetEmp.userId?.firstName || 'Employee'} ${targetEmp.userId?.lastName || ''}`.trim();
             setRecentLiveEvents((rev) => [
               {
                 id: Date.now(),
-                name: `${targetEmp.userId?.firstName || 'Employee'} ${targetEmp.userId?.lastName || ''}`.trim(),
+                name: empName,
+                employeeCode: targetEmp.employeeCode || '',
                 status: data.status,
                 app: data.currentApplication,
+                durationSeconds: data.todayActiveSeconds || 1,
                 time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                 isLiveNow: data.status === 'ACTIVE'
               },
-              ...rev.filter((r) => r.name !== `${targetEmp.userId?.firstName || ''} ${targetEmp.userId?.lastName || ''}`.trim()).slice(0, 11)
+              ...rev.filter((r) => r.name !== empName).slice(0, 11)
             ]);
           }
 
@@ -220,16 +234,19 @@ export default function DashboardOverviewPage() {
         setEmployees((prev) => {
           const target = prev.find((e) => e._id === data.employeeId);
           if (target && data.currentApplication) {
+            const empName = `${target.userId?.firstName || 'Employee'} ${target.userId?.lastName || ''}`.trim();
             setRecentLiveEvents((rev) => [
               {
                 id: Date.now(),
-                name: `${target.userId?.firstName || 'Employee'} ${target.userId?.lastName || ''}`.trim(),
+                name: empName,
+                employeeCode: target.employeeCode || '',
                 status: target.currentStatus || 'ACTIVE',
                 app: data.currentApplication,
+                durationSeconds: data.durationSeconds || 1,
                 time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                 isLiveNow: true
               },
-              ...rev.slice(0, 11)
+              ...rev.map((item) => (item.name === empName ? { ...item, isLiveNow: false } : item)).slice(0, 11)
             ]);
           }
 
@@ -521,10 +538,17 @@ export default function DashboardOverviewPage() {
                         <Icon className="w-3.5 h-3.5" />
                         <span className="truncate max-w-[130px]">{worker.currentApplication}</span>
                       </div>
-                      <span className="text-[10px] font-semibold text-emerald-400 flex items-center gap-1">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-                        Live in app
-                      </span>
+                      <div className="flex items-center gap-1.5 text-[10px]">
+                        <span className="font-semibold text-emerald-400 flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                          Live in app
+                        </span>
+                        {worker.todayActiveSeconds > 0 && (
+                          <span className="text-slate-400 font-mono">
+                            • {formatDuration(worker.todayActiveSeconds)}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 );
@@ -542,28 +566,59 @@ export default function DashboardOverviewPage() {
             </div>
           )}
 
-          {/* Recent Live Switch Feed Bar */}
+          {/* Dedicated Recent Activity & Application Usage Stream */}
           {recentLiveEvents.length > 0 && (
-            <div className="pt-2 border-t border-slate-800/60 flex items-center gap-3 overflow-x-auto text-xs text-slate-400 whitespace-nowrap">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 shrink-0">
-                Recent Switches:
-              </span>
-              {recentLiveEvents.slice(0, 4).map((ev) => {
-                const visuals = getAppVisuals(ev.app);
-                const Icon = visuals.icon;
-                return (
-                  <span
-                    key={ev.id}
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-950/60 border border-slate-800 text-[11px] font-medium"
-                  >
-                    <strong className="text-white">{ev.name}</strong>
-                    <span className="text-slate-500">→</span>
-                    <Icon className="w-3 h-3 text-indigo-400" />
-                    <span className="text-indigo-300 font-semibold">{ev.app}</span>
-                    <span className="text-slate-500 text-[10px]">({ev.time})</span>
-                  </span>
-                );
-              })}
+            <div className="pt-3 border-t border-slate-800/80 space-y-2.5">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
+                  <Activity className="w-3.5 h-3.5 text-indigo-400" />
+                  Recent Activity Stream (Tracked Software & Elapsed Duration)
+                </span>
+                <span className="text-[10px] text-indigo-400 font-semibold bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 rounded-md">
+                  Active OS Telemetry
+                </span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                {recentLiveEvents.slice(0, 6).map((ev) => {
+                  const visuals = getAppVisuals(ev.app);
+                  const Icon = visuals.icon;
+                  return (
+                    <div
+                      key={ev.id}
+                      className={`p-3 rounded-xl border flex items-center justify-between text-xs transition-all ${
+                        ev.isLiveNow
+                          ? 'bg-slate-950/90 border-emerald-500/50 shadow-md shadow-emerald-500/10 ring-1 ring-emerald-500/20'
+                          : 'bg-slate-950/50 border-slate-800/80 hover:border-slate-700'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className={`p-2 rounded-xl border shrink-0 ${visuals.color}`}>
+                          <Icon className="w-4 h-4" />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <strong className="text-white text-xs truncate max-w-[110px]">{ev.name}</strong>
+                            {ev.isLiveNow ? (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-black bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                                <span className="w-1 h-1 rounded-full bg-emerald-400 animate-ping" />
+                                LIVE
+                              </span>
+                            ) : null}
+                          </div>
+                          <p className="text-[11px] text-slate-400 font-medium truncate">{ev.app}</p>
+                        </div>
+                      </div>
+
+                      <div className="text-right shrink-0">
+                        <span className="text-[11px] font-bold font-mono text-emerald-400 block">
+                          {formatDuration(ev.durationSeconds || 0)}
+                        </span>
+                        <span className="text-[10px] text-slate-500 font-mono">{ev.time}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
         </div>
