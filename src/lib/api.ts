@@ -6,7 +6,7 @@ const getApiBaseUrl = (): string => {
     }
   }
   const envUrl = (typeof import.meta !== 'undefined' && import.meta.env && (import.meta.env.VITE_API_URL as string)) || '';
-  return envUrl || 'https://highpbackend.vercel.app/api';
+  return envUrl || 'https://highp-agent-backend.onrender.com/api';
 };
 
 const API_BASE_URL = getApiBaseUrl();

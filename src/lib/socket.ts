@@ -8,7 +8,7 @@ const getSocketUrl = (): string => {
     }
   }
   const envUrl = (typeof import.meta !== 'undefined' && import.meta.env && (import.meta.env.VITE_SOCKET_URL as string)) || '';
-  return envUrl || 'https://highpbackend.vercel.app';
+  return envUrl || 'https://highp-agent-backend.onrender.com';
 };
 
 const SOCKET_URL = getSocketUrl();
