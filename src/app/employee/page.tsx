@@ -4,7 +4,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../lib/authContext';
 import { api } from '../../lib/api';
-import { formatDuration } from '../../lib/utils';
+import { formatDuration, getLocalDateString } from '../../lib/utils';
 import { StatusBadge } from '../../components/StatusBadge';
 import { TimelineVisualizer } from '../../components/TimelineVisualizer';
 import {
@@ -23,7 +23,9 @@ import {
   LogOut,
   ArrowLeft,
   Download,
-  Check
+  Check,
+  AlertCircle,
+  X
 } from 'lucide-react';
 import { ActivityState, BreakReason } from '@highp/shared';
 import { getDesktopAgentDownloadUrl } from '../../lib/constants';
@@ -36,10 +38,28 @@ export default function EmployeeWorkspacePage() {
   const [timelineEvents, setTimelineEvents] = useState<any[]>([]);
   const [appUsages, setAppUsages] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [actionError, setActionError] = useState<string>('');
   const [breakReason, setBreakReason] = useState<string>(BreakReason.LUNCH);
 
   const [showInstallBanner, setShowInstallBanner] = useState(true);
   const [autoDownloaded, setAutoDownloaded] = useState(false);
+
+  // Synchronize currentProfile whenever profile arrives from auth context
+  useEffect(() => {
+    if (profile) {
+      setCurrentProfile((prev: any) => ({
+        ...prev,
+        ...profile
+      }));
+    }
+  }, [profile]);
+
+  // Authentication guard
+  useEffect(() => {
+    if (!isLoading && !user) {
+      navigate('/login');
+    }
+  }, [user, isLoading, navigate]);
 
   // Real-Time Live Tracking Engine State
   const [liveActiveSeconds, setLiveActiveSeconds] = useState(0);
@@ -79,13 +99,14 @@ export default function EmployeeWorkspacePage() {
   };
 
   const fetchMyData = useCallback(async () => {
-    if (!profile?._id) return;
+    const empId = profile?._id || currentProfile?._id || user?.employeeProfileId;
+    if (!empId) return;
     try {
-      const today = new Date().toISOString().slice(0, 10);
+      const today = getLocalDateString();
       const [empRes, timelineRes, appRes] = await Promise.all([
-        api.get(`/employees/${profile._id}`),
-        api.get(`/activity/${profile._id}/timeline?date=${today}`),
-        api.get(`/applications/usage/${profile._id}?date=${today}`)
+        api.get(`/employees/${empId}`),
+        api.get(`/activity/${empId}/timeline?date=${today}`),
+        api.get(`/applications/usage/${empId}?date=${today}`)
       ]);
 
       if (empRes.data?.data?.profile) {
@@ -101,19 +122,20 @@ export default function EmployeeWorkspacePage() {
     } catch (err) {
       console.error('[Employee] Fetch error:', err);
     }
-  }, [profile?._id]);
+  }, [profile?._id, currentProfile?._id, user?.employeeProfileId]);
 
   useEffect(() => {
-    if (profile?._id) {
+    const empId = profile?._id || currentProfile?._id || user?.employeeProfileId;
+    if (empId) {
       fetchMyData();
       const interval = setInterval(fetchMyData, 10000);
       return () => clearInterval(interval);
     }
-  }, [profile?._id, fetchMyData]);
+  }, [profile?._id, currentProfile?._id, user?.employeeProfileId, fetchMyData]);
 
   const isWorking = !!currentProfile?.currentSessionId;
   const isOnBreak = currentProfile?.currentStatus === ActivityState.BREAK;
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = getLocalDateString();
 
   // Track User Interaction for Idle Detection
   useEffect(() => {
@@ -198,7 +220,8 @@ const getBrowserAppName = (): string => {
   // Periodic 15-Second Attendance Heartbeat to Backend
   const sendHeartbeat = useCallback(
     async (overrideStatus?: ActivityState, durationSec = 15) => {
-      if (!isWorkingRef.current || !profile?._id) return;
+      const empId = profile?._id || currentProfile?._id || user?.employeeProfileId;
+      if (!isWorkingRef.current || !empId) return;
       try {
         const effectiveStatus =
           overrideStatus ||
@@ -220,7 +243,7 @@ const getBrowserAppName = (): string => {
         console.warn('[Tracking] Heartbeat sync warning:', err);
       }
     },
-    [profile?._id]
+    [profile?._id, currentProfile?._id, user?.employeeProfileId]
   );
 
   useEffect(() => {
@@ -246,6 +269,7 @@ const getBrowserAppName = (): string => {
   }, [sendHeartbeat, fetchMyData]);
 
   const handleStartWork = async () => {
+    setActionError('');
     setLoading(true);
     try {
       const browserApp = getBrowserAppName();
@@ -268,8 +292,10 @@ const getBrowserAppName = (): string => {
       setIsIdle(false);
       await fetchMyData();
       await refreshAuth();
-    } catch (err) {
+    } catch (err: any) {
+      const msg = err.response?.data?.message || err.message || 'Failed to start work session.';
       console.error('[Employee] Start work error:', err);
+      setActionError(msg);
     } finally {
       setLoading(false);
     }
@@ -277,42 +303,51 @@ const getBrowserAppName = (): string => {
 
   const handleEndWork = async () => {
     if (!confirm('Are you sure you want to end your work session?')) return;
+    setActionError('');
     setLoading(true);
     try {
       await sendHeartbeat(ActivityState.OFFLINE, 1);
       await api.post('/attendance/end', {});
       await fetchMyData();
       await refreshAuth();
-    } catch (err) {
+    } catch (err: any) {
+      const msg = err.response?.data?.message || err.message || 'Failed to end work session.';
       console.error('[Employee] End work error:', err);
+      setActionError(msg);
     } finally {
       setLoading(false);
     }
   };
 
   const handleStartBreak = async () => {
+    setActionError('');
     setLoading(true);
     try {
       await api.post('/breaks/start', { reason: breakReason });
       await sendHeartbeat(ActivityState.BREAK, 1);
       await fetchMyData();
       await refreshAuth();
-    } catch (err) {
+    } catch (err: any) {
+      const msg = err.response?.data?.message || err.message || 'Failed to start break.';
       console.error('[Employee] Start break error:', err);
+      setActionError(msg);
     } finally {
       setLoading(false);
     }
   };
 
   const handleEndBreak = async () => {
+    setActionError('');
     setLoading(true);
     try {
       await api.post('/breaks/end', {});
       await sendHeartbeat(ActivityState.ACTIVE, 1);
       await fetchMyData();
       await refreshAuth();
-    } catch (err) {
+    } catch (err: any) {
+      const msg = err.response?.data?.message || err.message || 'Failed to resume work from break.';
       console.error('[Employee] End break error:', err);
+      setActionError(msg);
     } finally {
       setLoading(false);
     }
@@ -328,6 +363,8 @@ const getBrowserAppName = (): string => {
       </div>
     );
   }
+
+  if (!user) return null;
 
   return (
     <div className="flex-1 flex flex-col min-h-0 bg-[#0B0F19] text-slate-100">
@@ -375,6 +412,22 @@ const getBrowserAppName = (): string => {
       </header>
 
       <main className="p-4 sm:p-8 pb-24 space-y-6 sm:space-y-8 flex-1 overflow-y-auto max-w-6xl mx-auto w-full">
+        {actionError && (
+          <div className="flex items-center justify-between p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs font-semibold animate-fade-in">
+            <div className="flex items-center gap-2.5">
+              <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+              <span>{actionError}</span>
+            </div>
+            <button
+              onClick={() => setActionError('')}
+              className="p-1 rounded-lg hover:bg-rose-500/20 text-rose-400 hover:text-white transition-colors"
+              title="Dismiss error"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
         {/* Desktop Agent Auto-Download & Setup Banner */}
         {showInstallBanner && (
           <div className="bg-gradient-to-r from-slate-900 via-indigo-950/70 to-slate-900 border border-indigo-500/30 rounded-2xl p-4 sm:p-5 text-white shadow-xl relative overflow-hidden">

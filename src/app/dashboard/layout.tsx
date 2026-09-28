@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { useNavigate, Outlet } from 'react-router-dom';
 import { Sidebar } from '../../components/Sidebar';
 import { useAuth } from '../../lib/authContext';
+import { UserRole } from '@highp/shared';
 
 export default function DashboardLayout({
   children
@@ -12,8 +13,12 @@ export default function DashboardLayout({
   const { user, isLoading } = useAuth();
 
   useEffect(() => {
-    if (!isLoading && !user) {
-      navigate('/login');
+    if (!isLoading) {
+      if (!user) {
+        navigate('/login');
+      } else if (user.role === UserRole.EMPLOYEE) {
+        navigate('/employee');
+      }
     }
   }, [user, isLoading, navigate]);
 

@@ -1,12 +1,17 @@
 const getApiBaseUrl = (): string => {
+  const envUrl =
+    (typeof import.meta !== 'undefined' && import.meta.env && ((import.meta.env.VITE_API_URL as string) || (import.meta.env.NEXT_PUBLIC_API_URL as string))) ||
+    '';
+  if (envUrl) {
+    return envUrl;
+  }
   if (typeof window !== 'undefined') {
     const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
     if (isLocalhost) {
       return 'http://localhost:5000/api';
     }
   }
-  const envUrl = (typeof import.meta !== 'undefined' && import.meta.env && (import.meta.env.VITE_API_URL as string)) || '';
-  return envUrl || 'https://highp-agent-backend.onrender.com/api';
+  return 'https://highp-agent-backend.onrender.com/api';
 };
 
 const API_BASE_URL = getApiBaseUrl();
@@ -33,8 +38,11 @@ class ApiClient {
   }
 
   private buildUrl(path: string, params?: Record<string, any>): string {
-    const cleanPath = path.startsWith('/') ? path : `/${path}`;
+    let cleanPath = path.startsWith('/') ? path : `/${path}`;
     const baseWithApi = this.baseURL.endsWith('/api') ? this.baseURL : `${this.baseURL}/api`;
+    if (baseWithApi.endsWith('/api') && cleanPath.startsWith('/api/')) {
+      cleanPath = cleanPath.slice(4);
+    }
     let fullUrl = `${baseWithApi}${cleanPath}`;
 
     if (params) {
@@ -81,8 +89,9 @@ class ApiClient {
       }
     }
 
+    const effectiveTimeoutMs = options.timeoutMs || 25000;
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), options.timeoutMs || 8000);
+    const timeout = setTimeout(() => controller.abort(), effectiveTimeoutMs);
 
     let response: Response;
     try {
@@ -96,7 +105,10 @@ class ApiClient {
     } catch (networkError: any) {
       clearTimeout(timeout);
       const isAbort = networkError.name === 'AbortError';
-      const err: any = new Error(isAbort ? 'Request timed out after 8 seconds' : (networkError.message || 'Network request failed'));
+      const timeoutSec = Math.round(effectiveTimeoutMs / 1000);
+      const err: any = new Error(
+        isAbort ? `Request timed out after ${timeoutSec} seconds` : (networkError.message || 'Network request failed')
+      );
       err.response = { status: 0, data: { success: false, message: err.message } };
       throw err;
     } finally {

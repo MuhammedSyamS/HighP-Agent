@@ -1,14 +1,19 @@
 import { io, Socket } from 'socket.io-client';
 
 const getSocketUrl = (): string => {
+  const envUrl =
+    (typeof import.meta !== 'undefined' && import.meta.env && ((import.meta.env.VITE_SOCKET_URL as string) || (import.meta.env.NEXT_PUBLIC_SOCKET_URL as string))) ||
+    '';
+  if (envUrl) {
+    return envUrl;
+  }
   if (typeof window !== 'undefined') {
     const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
     if (isLocalhost) {
       return 'http://localhost:5000';
     }
   }
-  const envUrl = (typeof import.meta !== 'undefined' && import.meta.env && (import.meta.env.VITE_SOCKET_URL as string)) || '';
-  return envUrl || 'https://highp-agent-backend.onrender.com';
+  return 'https://highp-agent-backend.onrender.com';
 };
 
 const SOCKET_URL = getSocketUrl();

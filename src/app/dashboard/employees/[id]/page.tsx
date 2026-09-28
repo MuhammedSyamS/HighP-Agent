@@ -7,7 +7,7 @@ import { StatCard } from '../../../../components/StatCard';
 import { StatusBadge } from '../../../../components/StatusBadge';
 import { TimelineVisualizer } from '../../../../components/TimelineVisualizer';
 import { api } from '../../../../lib/api';
-import { formatDuration, formatPercent } from '../../../../lib/utils';
+import { formatDuration, formatPercent, getLocalDateString } from '../../../../lib/utils';
 import {
   ArrowLeft,
   Moon,
@@ -25,7 +25,7 @@ export default function EmployeeDetailPage() {
   const params = useParams();
   const employeeId = params?.id as string;
 
-  const [dateStr, setDateStr] = useState(new Date().toISOString().slice(0, 10));
+  const [dateStr, setDateStr] = useState(getLocalDateString());
   const [employeeData, setEmployeeData] = useState<any>(null);
   const [timelineEvents, setTimelineEvents] = useState<any[]>([]);
   const [appUsages, setAppUsages] = useState<any[]>([]);

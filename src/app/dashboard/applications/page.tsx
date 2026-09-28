@@ -3,13 +3,13 @@
 import React, { useEffect, useState } from 'react';
 import { Header } from '../../../components/Header';
 import { api } from '../../../lib/api';
-import { formatDuration } from '../../../lib/utils';
+import { formatDuration, getLocalDateString } from '../../../lib/utils';
 import { Monitor, Users, Calendar, Layers, Sparkles, Clock, ArrowUpRight } from 'lucide-react';
 
 export default function ApplicationsPage() {
   const [appsData, setAppsData] = useState<any[]>([]);
   const [totalTime, setTotalTime] = useState(0);
-  const [dateStr, setDateStr] = useState(new Date().toISOString().slice(0, 10));
+  const [dateStr, setDateStr] = useState(getLocalDateString());
   const [loading, setLoading] = useState(true);
 
   const fetchApplicationUsage = async () => {

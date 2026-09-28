@@ -121,10 +121,16 @@ export const TimelineVisualizer: React.FC<TimelineVisualizerProps> = ({ events, 
       {/* Event Timeline Cards */}
       <div className="relative pl-6 space-y-4 before:absolute before:left-2.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-gradient-to-b before:from-indigo-500 before:via-slate-800 before:to-slate-900">
         {events.map((evt, idx) => {
-          const start = new Date(evt.startedAt);
-          const end = new Date(evt.endedAt);
-          const startTimeStr = start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-          const endTimeStr = end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+          const start = evt.startedAt ? new Date(evt.startedAt) : null;
+          const end = evt.endedAt ? new Date(evt.endedAt) : null;
+          const startTimeStr =
+            start && !isNaN(start.getTime())
+              ? start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+              : '—';
+          const endTimeStr =
+            end && !isNaN(end.getTime())
+              ? end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+              : 'Now';
 
           return (
             <div key={evt.eventId || idx} className="relative flex items-start gap-3 group">

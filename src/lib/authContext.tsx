@@ -12,6 +12,8 @@ interface AuthUser {
   lastName: string;
   role: UserRole;
   status: string;
+  companyId?: string;
+  employeeProfileId?: string;
 }
 
 interface AuthCompany {
@@ -37,10 +39,43 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<AuthUser | null>(null);
-  const [company, setCompany] = useState<AuthCompany | null>(null);
-  const [profile, setProfile] = useState<any | null>(null);
-  const [token, setToken] = useState<string | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const cached = localStorage.getItem('highp_user');
+        if (cached) return JSON.parse(cached);
+      } catch {}
+    }
+    return null;
+  });
+
+  const [company, setCompany] = useState<AuthCompany | null>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const cached = localStorage.getItem('highp_company');
+        if (cached) return JSON.parse(cached);
+      } catch {}
+    }
+    return null;
+  });
+
+  const [profile, setProfile] = useState<any | null>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const cached = localStorage.getItem('highp_profile');
+        if (cached) return JSON.parse(cached);
+      } catch {}
+    }
+    return null;
+  });
+
+  const [token, setToken] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('highp_token');
+    }
+    return null;
+  });
+
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchCurrentUser = async () => {
@@ -62,6 +97,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         try { setCompany(JSON.parse(cachedCompany)); } catch {}
       }
 
+      const cachedProfile = localStorage.getItem('highp_profile');
+      if (cachedProfile) {
+        try { setProfile(JSON.parse(cachedProfile)); } catch {}
+      }
+
       const res = await api.get('/auth/me');
       if (res.data && res.data.data) {
         const u = res.data.data.user;
@@ -72,16 +112,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setProfile(p);
         localStorage.setItem('highp_user', JSON.stringify(u));
         localStorage.setItem('highp_company', JSON.stringify(c));
+        if (p) {
+          localStorage.setItem('highp_profile', JSON.stringify(p));
+        }
         getSocket(storedToken);
       }
-    } catch (err) {
-      localStorage.removeItem('highp_token');
-      localStorage.removeItem('highp_user');
-      localStorage.removeItem('highp_company');
-      setUser(null);
-      setCompany(null);
-      setProfile(null);
-      setToken(null);
+    } catch (err: any) {
+      if (err?.response?.status === 401 || err?.response?.status === 403) {
+        localStorage.removeItem('highp_token');
+        localStorage.removeItem('highp_refresh_token');
+        localStorage.removeItem('highp_user');
+        localStorage.removeItem('highp_company');
+        localStorage.removeItem('highp_profile');
+        setUser(null);
+        setCompany(null);
+        setProfile(null);
+        setToken(null);
+      } else {
+        // Network timeout / offline / cold start: retain cached session so user isn't logged out
+        console.warn('[AuthContext] Session verification network warning:', err?.message);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -99,6 +149,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.setItem('highp_refresh_token', tokens.refreshToken);
     localStorage.setItem('highp_user', JSON.stringify(u));
     localStorage.setItem('highp_company', JSON.stringify(c));
+    if (p) {
+      localStorage.setItem('highp_profile', JSON.stringify(p));
+    }
 
     setToken(tokens.accessToken);
     setUser(u);
@@ -119,6 +172,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.setItem('highp_refresh_token', tokens.refreshToken);
     localStorage.setItem('highp_user', JSON.stringify(u));
     localStorage.setItem('highp_company', JSON.stringify(c));
+    if (p) {
+      localStorage.setItem('highp_profile', JSON.stringify(p));
+    }
 
     setToken(tokens.accessToken);
     setUser(u);
@@ -152,6 +208,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch {}
     localStorage.removeItem('highp_token');
     localStorage.removeItem('highp_refresh_token');
+    localStorage.removeItem('highp_user');
+    localStorage.removeItem('highp_company');
+    localStorage.removeItem('highp_profile');
     setUser(null);
     setCompany(null);
     setProfile(null);
