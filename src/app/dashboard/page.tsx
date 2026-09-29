@@ -262,6 +262,74 @@ export default function DashboardOverviewPage() {
         });
       };
 
+      const handleTelemetryUpdated = (data: any) => {
+        if (!data || !data.employeeProfileId) return;
+
+        setEmployees((prev) => {
+          const updatedList = prev.map((emp) => {
+            if (emp._id === data.employeeProfileId) {
+              const newStatus = (data.status || emp.currentStatus || 'OFFLINE').toUpperCase();
+              return {
+                ...emp,
+                currentStatus: newStatus,
+                currentApplication: data.application !== undefined ? (data.application || '') : emp.currentApplication,
+                lastActiveAt: data.lastSeenAt || emp.lastActiveAt,
+                currentAppStartedAt: data.startedAt || emp.currentAppStartedAt
+              };
+            }
+            return emp;
+          });
+
+          // Recompute overview counts
+          let active = 0;
+          let idle = 0;
+          let onBreak = 0;
+          let offline = 0;
+          for (const item of updatedList) {
+            const st = (item.currentStatus || '').toUpperCase();
+            if (st === 'ACTIVE') active++;
+            else if (st === 'IDLE') idle++;
+            else if (st === 'BREAK') onBreak++;
+            else offline++;
+          }
+          setOverview((o) => ({
+            ...o,
+            activeNow: active,
+            idleNow: idle,
+            onBreakNow: onBreak,
+            offlineNow: offline,
+            currentlyWorking: active + idle
+          }));
+
+          const targetEmp = prev.find((e) => e._id === data.employeeProfileId);
+          if (targetEmp && data.application && !data.application.toLowerCase().includes('highp')) {
+            const empName = `${targetEmp.userId?.firstName || 'Employee'} ${targetEmp.userId?.lastName || ''}`.trim();
+            const timeStr = data.startedAt
+              ? new Date(data.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+              : data.lastSeenAt
+              ? new Date(data.lastSeenAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+              : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+            setRecentLiveEvents((rev) => [
+              {
+                id: Date.now(),
+                name: empName,
+                employeeCode: targetEmp.employeeCode || '',
+                status: (data.status || 'ACTIVE').toUpperCase(),
+                app: data.application,
+                durationSeconds: data.activeDurationSeconds || 1,
+                time: timeStr,
+                isLiveNow: data.status === 'active'
+              },
+              ...rev.map((item) => (item.name === empName ? { ...item, isLiveNow: false } : item)).slice(0, 11)
+            ]);
+          }
+
+          return updatedList;
+        });
+      };
+
+      socket.on('employee:telemetry_updated', handleTelemetryUpdated);
       socket.on('employee:status_changed', handleStatusChange);
       socket.on('employee:activity_changed', handleActivityChange);
       socket.on('employee:session_started', fetchDashboardData);
@@ -270,6 +338,7 @@ export default function DashboardOverviewPage() {
       socket.on('employee:break_ended', fetchDashboardData);
 
       return () => {
+        socket.off('employee:telemetry_updated', handleTelemetryUpdated);
         socket.off('employee:status_changed', handleStatusChange);
         socket.off('employee:activity_changed', handleActivityChange);
         socket.off('employee:session_started', fetchDashboardData);

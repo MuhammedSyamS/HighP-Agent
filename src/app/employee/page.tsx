@@ -4,6 +4,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../lib/authContext';
 import { api } from '../../lib/api';
+import { getSocket } from '../../lib/socket';
 import { formatDuration, getLocalDateString } from '../../lib/utils';
 import { StatusBadge } from '../../components/StatusBadge';
 import { TimelineVisualizer } from '../../components/TimelineVisualizer';
@@ -103,10 +104,11 @@ export default function EmployeeWorkspacePage() {
     if (!empId) return;
     try {
       const today = getLocalDateString();
-      const [empRes, timelineRes, appRes] = await Promise.all([
+      const [empRes, timelineRes, appRes, liveRes] = await Promise.all([
         api.get(`/employees/${empId}`),
         api.get(`/activity/${empId}/timeline?date=${today}`),
-        api.get(`/applications/usage/${empId}?date=${today}`)
+        api.get(`/applications/usage/${empId}?date=${today}`),
+        api.get(`/employees/${empId}/live`).catch(() => null)
       ]);
 
       if (empRes.data?.data?.profile) {
@@ -116,6 +118,12 @@ export default function EmployeeWorkspacePage() {
         setLiveIdleSeconds((s) => Math.max(s, p.todayIdleSeconds || 0));
         setLiveBreakSeconds((s) => Math.max(s, p.todayBreakSeconds || 0));
         if (p.currentApplication) setCurrentAppFocus(p.currentApplication);
+      }
+      if (liveRes?.data?.data) {
+        const live = liveRes.data.data;
+        if (live.application && live.status === 'active') {
+          setCurrentAppFocus(live.application);
+        }
       }
       if (timelineRes.data?.data?.events) setTimelineEvents(timelineRes.data.data.events);
       if (appRes.data?.data?.applications) setAppUsages(appRes.data.data.applications);
@@ -129,6 +137,59 @@ export default function EmployeeWorkspacePage() {
     if (empId) {
       fetchMyData();
       const interval = setInterval(fetchMyData, 10000);
+
+      // Subscribe to real-time Socket.IO live telemetry events
+      const socket = getSocket();
+      if (socket) {
+        const handleTelemetryUpdated = (data: any) => {
+          if (data && data.employeeProfileId === empId) {
+            console.log(`[FRONTEND]\napplication=${data.application}`);
+            if (data.status === 'active') {
+              setCurrentAppFocus(data.application || 'Active Workstation');
+              setIsIdle(false);
+            } else if (data.status === 'idle') {
+              setIsIdle(true);
+            } else if (data.status === 'break') {
+              setCurrentAppFocus('On Break');
+            } else if (data.status === 'offline') {
+              setCurrentAppFocus('Session not active');
+            }
+          }
+        };
+
+        const handleStatusChanged = (data: any) => {
+          if (data && (data.employeeProfileId === empId || data.employeeId === empId)) {
+            setCurrentProfile((prev: any) => ({
+              ...prev,
+              currentStatus: data.status,
+              currentApplication: data.currentApplication !== undefined ? data.currentApplication : prev?.currentApplication
+            }));
+            if (data.status === 'ACTIVE' && data.currentApplication) {
+              setCurrentAppFocus(data.currentApplication);
+            }
+          }
+        };
+
+        const handleActivityChanged = (data: any) => {
+          if (data && (data.employeeProfileId === empId || data.employeeId === empId)) {
+            if (data.currentApplication) {
+              setCurrentAppFocus(data.currentApplication);
+            }
+          }
+        };
+
+        socket.on('employee:telemetry_updated', handleTelemetryUpdated);
+        socket.on('employee:status_changed', handleStatusChanged);
+        socket.on('employee:activity_changed', handleActivityChanged);
+
+        return () => {
+          clearInterval(interval);
+          socket.off('employee:telemetry_updated', handleTelemetryUpdated);
+          socket.off('employee:status_changed', handleStatusChanged);
+          socket.off('employee:activity_changed', handleActivityChanged);
+        };
+      }
+
       return () => clearInterval(interval);
     }
   }, [profile?._id, currentProfile?._id, user?.employeeProfileId, fetchMyData]);
@@ -232,10 +293,11 @@ const getBrowserAppName = (): string => {
             : ActivityState.ACTIVE);
         const idleTimeSeconds = Math.floor((Date.now() - lastActivityRef.current) / 1000);
         const browserApp = getBrowserAppName();
+        const isDesktopLinked = !!currentProfile?.currentDeviceId;
 
         await api.post('/attendance/heartbeat', {
           status: effectiveStatus,
-          ...(browserApp ? { currentApplication: browserApp } : {}),
+          ...(!isDesktopLinked && browserApp ? { currentApplication: browserApp } : {}),
           recentDurationSeconds: durationSec,
           idleSeconds: idleTimeSeconds
         });

@@ -7,6 +7,7 @@ import { StatCard } from '../../../../components/StatCard';
 import { StatusBadge } from '../../../../components/StatusBadge';
 import { TimelineVisualizer } from '../../../../components/TimelineVisualizer';
 import { api } from '../../../../lib/api';
+import { getSocket } from '../../../../lib/socket';
 import { formatDuration, formatPercent, getLocalDateString } from '../../../../lib/utils';
 import {
   ArrowLeft,
@@ -55,7 +56,31 @@ export default function EmployeeDetailPage() {
 
   useEffect(() => {
     fetchEmployeeData();
-  }, [fetchEmployeeData]);
+
+    const socket = getSocket();
+    if (socket && employeeId) {
+      const handleTelemetryUpdated = (data: any) => {
+        if (!data || data.employeeProfileId !== employeeId) return;
+        setEmployeeData((prev: any) => {
+          if (!prev?.profile) return prev;
+          return {
+            ...prev,
+            profile: {
+              ...prev.profile,
+              currentStatus: (data.status || prev.profile.currentStatus || 'OFFLINE').toUpperCase(),
+              currentApplication: data.application !== undefined ? (data.application || '') : prev.profile.currentApplication,
+              lastActiveAt: data.lastSeenAt || prev.profile.lastActiveAt
+            }
+          };
+        });
+      };
+
+      socket.on('employee:telemetry_updated', handleTelemetryUpdated);
+      return () => {
+        socket.off('employee:telemetry_updated', handleTelemetryUpdated);
+      };
+    }
+  }, [fetchEmployeeData, employeeId]);
 
   if (loading) {
     return (
