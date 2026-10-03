@@ -377,6 +377,46 @@ export default function DashboardOverviewPage() {
         });
       };
 
+      const handleCurrentApplication = (data: any) => {
+        if (!data || !data.employeeId || !data.application) return;
+        const appName = data.application.name || '';
+        const trackingState = data.application.trackingState || 'TRACKED';
+        const executableName = data.application.executableName || '';
+
+        setEmployees((prev) => {
+          const target = prev.find((e) => e._id === data.employeeId);
+          if (target && appName && !appName.toLowerCase().includes('highp')) {
+            const empName = `${target.userId?.firstName || 'Employee'} ${target.userId?.lastName || ''}`.trim();
+            setRecentLiveEvents((rev) => [
+              {
+                id: Date.now(),
+                name: empName,
+                employeeCode: target.employeeCode || '',
+                status: target.currentStatus || 'ACTIVE',
+                app: appName,
+                durationSeconds: 1,
+                time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                isLiveNow: target.currentStatus === 'ACTIVE'
+              },
+              ...rev.map((item) => (item.name === empName ? { ...item, isLiveNow: false } : item)).slice(0, 11)
+            ]);
+          }
+
+          return prev.map((emp) => {
+            if (emp._id === data.employeeId) {
+              return {
+                ...emp,
+                currentApplication: appName,
+                currentTrackingState: trackingState,
+                currentExecutable: executableName || emp.currentExecutable
+              };
+            }
+            return emp;
+          });
+        });
+      };
+
+      socket.on('agent:current-application', handleCurrentApplication);
       socket.on('employee:telemetry_updated', handleTelemetryUpdated);
       socket.on('employee:status_changed', handleStatusChange);
       socket.on('employee:activity_changed', handleActivityChange);
@@ -386,6 +426,7 @@ export default function DashboardOverviewPage() {
       socket.on('employee:break_ended', fetchDashboardData);
 
       return () => {
+        socket.off('agent:current-application', handleCurrentApplication);
         socket.off('employee:telemetry_updated', handleTelemetryUpdated);
         socket.off('employee:status_changed', handleStatusChange);
         socket.off('employee:activity_changed', handleActivityChange);
