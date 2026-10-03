@@ -228,6 +228,7 @@ export default function DashboardOverviewPage() {
                 currentStatus: data.status,
                 currentApplication: data.currentApplication ?? emp.currentApplication,
                 lastActiveAt: data.lastActiveAt,
+                currentWebsite: data.currentWebsite !== undefined ? data.currentWebsite : emp.currentWebsite,
                 todayActiveSeconds: data.todayActiveSeconds ?? emp.todayActiveSeconds,
                 todayIdleSeconds: data.todayIdleSeconds ?? emp.todayIdleSeconds,
                 todayBreakSeconds: data.todayBreakSeconds ?? emp.todayBreakSeconds
@@ -408,7 +409,8 @@ export default function DashboardOverviewPage() {
                 ...emp,
                 currentApplication: appName,
                 currentTrackingState: trackingState,
-                currentExecutable: executableName || emp.currentExecutable
+                currentExecutable: executableName || emp.currentExecutable,
+                currentWebsite: data.website?.domain ? data.website : null
               };
             }
             return emp;
@@ -951,9 +953,17 @@ export default function DashboardOverviewPage() {
                             {emp.currentStatus === ActivityState.OFFLINE ? (
                               <span className="text-slate-500 font-normal">None (Offline)</span>
                             ) : emp.currentApplication ? (
-                              <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-semibold ${visuals.color}`}>
-                                <Icon className="w-3.5 h-3.5 shrink-0" />
-                                <span className="truncate max-w-[170px]">{emp.currentApplication}</span>
+                              <div className="flex flex-col gap-1 items-start">
+                                <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-semibold ${visuals.color}`}>
+                                  <Icon className="w-3.5 h-3.5 shrink-0" />
+                                  <span className="truncate max-w-[170px]">{emp.currentApplication}</span>
+                                </div>
+                                {emp.currentWebsite?.domain && (
+                                  <span className="inline-flex items-center gap-1 text-[11px] font-mono text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded border border-cyan-500/20">
+                                    <Globe className="w-3 h-3 text-cyan-400" />
+                                    {emp.currentWebsite.domain}
+                                  </span>
+                                )}
                               </div>
                             ) : (
                               <span className="text-slate-500">No active application</span>
@@ -1022,13 +1032,21 @@ export default function DashboardOverviewPage() {
 
                   {/* Current Active App Spotlight */}
                   <div className="p-3 bg-slate-950/70 rounded-xl border border-slate-800 flex items-center justify-between">
-                    <span className="text-[11px] font-semibold text-slate-400">Current App Focus</span>
+                    <span className="text-[11px] font-semibold text-slate-400">Current Focus</span>
                     {emp.currentStatus === ActivityState.OFFLINE ? (
                       <span className="text-xs font-semibold text-slate-500">None (Offline)</span>
                     ) : emp.currentApplication ? (
-                      <div className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg border text-xs font-bold ${visuals.color}`}>
-                        <Icon className="w-3 h-3" />
-                        <span className="truncate max-w-[130px]">{emp.currentApplication}</span>
+                      <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                        <div className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg border text-xs font-bold ${visuals.color}`}>
+                          <Icon className="w-3 h-3" />
+                          <span className="truncate max-w-[110px]">{emp.currentApplication}</span>
+                        </div>
+                        {emp.currentWebsite?.domain && (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-mono text-cyan-400 bg-cyan-500/10 px-1.5 py-0.5 rounded border border-cyan-500/20">
+                            <Globe className="w-2.5 h-2.5 text-cyan-400" />
+                            {emp.currentWebsite.domain}
+                          </span>
+                        )}
                       </div>
                     ) : (
                       <span className="text-xs text-slate-500">No active application</span>
