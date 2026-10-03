@@ -9,7 +9,8 @@ import {
   UserCheck,
   LogOut,
   Menu,
-  X
+  X,
+  Layers
 } from 'lucide-react';
 import { useAuth } from '../lib/authContext';
 import { UserRole } from '@highp/shared';
@@ -28,10 +29,11 @@ export const Sidebar: React.FC = () => {
     ...(canAccessDashboard
       ? [
           { name: 'Live Dashboard', href: '/dashboard', icon: LayoutDashboard },
-          { name: 'Applications', href: '/dashboard/applications', icon: PieChart },
+          { name: 'App Tracking', href: '/dashboard/settings?tab=applications', icon: Layers },
+          { name: 'App Analytics', href: '/dashboard/applications', icon: PieChart },
           { name: 'Reports', href: '/dashboard/reports', icon: FileBarChart },
           { name: 'Devices', href: '/dashboard/devices', icon: Laptop },
-          ...(isHR ? [{ name: 'Transparency & Policy', href: '/dashboard/settings', icon: ShieldCheck }] : [])
+          ...(isHR ? [{ name: 'Settings & Policy', href: '/dashboard/settings?tab=policy', icon: ShieldCheck }] : [])
         ]
       : []),
     { name: 'My Employee Workspace', href: '/employee', icon: UserCheck }

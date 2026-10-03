@@ -112,6 +112,17 @@ export default function DashboardOverviewPage() {
     }>
   >([]);
 
+  // Section 20 & 21: Application Activity & Analytics State
+  const [activityRecords, setActivityRecords] = useState<any[]>([]);
+  const [activityAppFilter, setActivityAppFilter] = useState('');
+  const [activityCategoryFilter, setActivityCategoryFilter] = useState('ALL');
+  const [activityEmployeeFilter, setActivityEmployeeFilter] = useState('ALL');
+  const [activityDateFilter, setActivityDateFilter] = useState(new Date().toISOString().slice(0, 10));
+  const [activityStatusFilter, setActivityStatusFilter] = useState('ALL');
+  const [appUsageAnalytics, setAppUsageAnalytics] = useState<any[]>([]);
+  const [totalAppUsageSeconds, setTotalAppUsageSeconds] = useState(0);
+  const [isActivityLoading, setIsActivityLoading] = useState(false);
+
   // Add Employee Modal
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [newEmail, setNewEmail] = useState('');
@@ -123,6 +134,37 @@ export default function DashboardOverviewPage() {
   const [newTitle, setNewTitle] = useState('');
   const [modalError, setModalError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const fetchActivityData = useCallback(async () => {
+    setIsActivityLoading(true);
+    try {
+      const [actRes, usageRes] = await Promise.all([
+        api.get('/activity', {
+          params: {
+            date: activityDateFilter,
+            category: activityCategoryFilter !== 'ALL' ? activityCategoryFilter : undefined,
+            application: activityAppFilter.trim() || undefined,
+            employeeId: activityEmployeeFilter !== 'ALL' ? activityEmployeeFilter : undefined,
+            status: activityStatusFilter !== 'ALL' ? activityStatusFilter : undefined,
+            limit: 50
+          }
+        }),
+        api.get(`/applications/usage?date=${activityDateFilter}`)
+      ]);
+
+      if (actRes.data?.data && Array.isArray(actRes.data.data)) {
+        setActivityRecords(actRes.data.data);
+      }
+      if (usageRes.data?.data) {
+        setAppUsageAnalytics(usageRes.data.data.applications || []);
+        setTotalAppUsageSeconds(usageRes.data.data.totalTimeOverall || 0);
+      }
+    } catch (err) {
+      console.error('[Dashboard] Error fetching activity/usage:', err);
+    } finally {
+      setIsActivityLoading(false);
+    }
+  }, [activityDateFilter, activityCategoryFilter, activityAppFilter, activityEmployeeFilter, activityStatusFilter]);
 
   const fetchDashboardData = useCallback(async () => {
     try {
@@ -167,7 +209,13 @@ export default function DashboardOverviewPage() {
 
   useEffect(() => {
     fetchDashboardData();
+  }, [fetchDashboardData]);
 
+  useEffect(() => {
+    fetchActivityData();
+  }, [fetchActivityData]);
+
+  useEffect(() => {
     // Subscribe to real-time Socket.IO events
     const socket = getSocket();
     if (socket) {
@@ -978,6 +1026,289 @@ export default function DashboardOverviewPage() {
             })}
           </div>
         )}
+
+        {/* SECTION 21: APPLICATION USAGE ANALYTICS */}
+        <div className="bg-slate-900/70 border border-slate-800/80 rounded-2xl p-6 shadow-xl backdrop-blur-xl space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-800/80">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-indigo-500" />
+                <h3 className="text-base font-bold text-white tracking-tight">Application Usage Analytics</h3>
+                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                  Persisted
+                </span>
+              </div>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Aggregate time spent across all registered workstation applications for {activityDateFilter}
+              </p>
+            </div>
+            <div className="text-xs font-semibold px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-300 self-start sm:self-auto">
+              Total Recorded Time:{' '}
+              <strong className="text-emerald-400 ml-1 font-mono">{formatDuration(totalAppUsageSeconds)}</strong>
+            </div>
+          </div>
+
+          {appUsageAnalytics.length === 0 ? (
+            <div className="p-8 rounded-xl bg-slate-950/40 border border-slate-800/60 text-center text-slate-500 text-xs">
+              <Monitor className="w-8 h-8 text-slate-600 mx-auto mb-2 opacity-50" />
+              No persisted application usage records found for this date.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3.5">
+              {appUsageAnalytics.slice(0, 10).map((app, idx) => {
+                const visuals = getAppVisuals(app.applicationName);
+                const Icon = visuals.icon;
+                const pct = totalAppUsageSeconds > 0 ? Math.round((app.totalSeconds / totalAppUsageSeconds) * 100) : 0;
+
+                return (
+                  <div
+                    key={idx}
+                    className="p-4 rounded-xl bg-slate-950/70 border border-slate-800/80 hover:border-indigo-500/40 transition-all flex flex-col justify-between gap-3 group shadow-md"
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className={`p-2 rounded-lg border shrink-0 ${visuals.color}`}>
+                          <Icon className="w-4 h-4" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-bold text-white text-xs truncate group-hover:text-indigo-300 transition-colors">
+                            {app.applicationName}
+                          </p>
+                          <span className="text-[10px] text-slate-400">{app.category || 'Other'}</span>
+                        </div>
+                      </div>
+                      <span className="text-[11px] font-bold text-indigo-400 font-mono">{pct}%</span>
+                    </div>
+
+                    <div>
+                      <div className="flex justify-between items-baseline text-xs mb-1.5">
+                        <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Duration</span>
+                        <strong className="text-white font-mono text-sm font-bold">
+                          {formatDuration(app.totalSeconds)}
+                        </strong>
+                      </div>
+                      <div className="w-full h-1.5 bg-slate-900 rounded-full overflow-hidden border border-slate-800">
+                        <div
+                          className="h-full bg-gradient-to-r from-indigo-500 to-violet-500 rounded-full"
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* SECTION 20: PERSISTED APPLICATION ACTIVITY RECORDS TABLE */}
+        <div className="bg-slate-900/70 border border-slate-800/80 rounded-2xl shadow-xl overflow-hidden backdrop-blur-xl space-y-4 p-6">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-slate-800/80">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                <h3 className="text-base font-bold text-white tracking-tight">Application Activity Records</h3>
+                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                  MongoDB Source of Truth
+                </span>
+              </div>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Authoritative chronological application session logs with duration and status
+              </p>
+            </div>
+            {isActivityLoading && (
+              <span className="text-xs text-indigo-400 font-semibold animate-pulse">
+                Synchronizing activity...
+              </span>
+            )}
+          </div>
+
+          {/* Section 20 Filters: Application, Category, Employee, Date, Status */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+            {/* Filter 1: Application */}
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Filter by app (e.g. Code, Chrome)..."
+                value={activityAppFilter}
+                onChange={(e) => setActivityAppFilter(e.target.value)}
+                className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-indigo-500 font-medium"
+              />
+            </div>
+
+            {/* Filter 2: Category */}
+            <div>
+              <select
+                value={activityCategoryFilter}
+                onChange={(e) => setActivityCategoryFilter(e.target.value)}
+                className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs font-semibold text-slate-200 focus:outline-none focus:border-indigo-500"
+              >
+                <option value="ALL">All Categories</option>
+                <option value="Development">Development</option>
+                <option value="Design">Design</option>
+                <option value="Communication">Communication</option>
+                <option value="Browsers">Browsers</option>
+                <option value="Productivity">Productivity</option>
+                <option value="Marketing">Marketing</option>
+                <option value="Project Management">Project Management</option>
+                <option value="File Management">File Management</option>
+                <option value="Media">Media</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+
+            {/* Filter 3: Employee */}
+            <div>
+              <select
+                value={activityEmployeeFilter}
+                onChange={(e) => setActivityEmployeeFilter(e.target.value)}
+                className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs font-semibold text-slate-200 focus:outline-none focus:border-indigo-500"
+              >
+                <option value="ALL">All Employees</option>
+                {employees.map((emp) => {
+                  const empName = emp.userId ? `${emp.userId.firstName} ${emp.userId.lastName}` : emp.employeeCode;
+                  return (
+                    <option key={emp._id} value={emp._id}>
+                      {empName} ({emp.employeeCode})
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+
+            {/* Filter 4: Date */}
+            <div className="relative flex items-center">
+              <input
+                type="date"
+                value={activityDateFilter}
+                onChange={(e) => setActivityDateFilter(e.target.value)}
+                className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs font-semibold text-slate-200 focus:outline-none focus:border-indigo-500"
+              />
+            </div>
+
+            {/* Filter 5: Status */}
+            <div>
+              <select
+                value={activityStatusFilter}
+                onChange={(e) => setActivityStatusFilter(e.target.value)}
+                className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs font-semibold text-slate-200 focus:outline-none focus:border-indigo-500"
+              >
+                <option value="ALL">All Statuses</option>
+                <option value="ACTIVE">Active</option>
+                <option value="IDLE">Idle</option>
+                <option value="COMPLETED">Completed</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Activity Records Table */}
+          <div className="overflow-x-auto rounded-xl border border-slate-800/80">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-950/90 text-slate-400 font-bold uppercase tracking-wider border-b border-slate-800 text-[11px]">
+                <tr>
+                  <th className="px-5 py-3.5">Application</th>
+                  <th className="px-5 py-3.5">Category</th>
+                  <th className="px-5 py-3.5">Employee</th>
+                  <th className="px-5 py-3.5">Started</th>
+                  <th className="px-5 py-3.5">Last Seen</th>
+                  <th className="px-5 py-3.5">Duration</th>
+                  <th className="px-5 py-3.5">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/60 font-medium text-slate-300">
+                {activityRecords.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="px-6 py-12 text-center text-slate-500">
+                      <Clock className="w-7 h-7 text-slate-600 mx-auto mb-2 opacity-50" />
+                      No activity session records match your filter criteria.
+                    </td>
+                  </tr>
+                ) : (
+                  activityRecords.map((rec, i) => {
+                    const visuals = getAppVisuals(rec.applicationName);
+                    const Icon = visuals.icon;
+                    const u = rec.employeeId?.userId;
+                    const empName = u ? `${u.firstName || ''} ${u.lastName || ''}`.trim() || 'Employee' : 'Employee';
+                    const startedFormatted = rec.startedAt
+                      ? new Date(rec.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                      : '—';
+                    const lastSeenFormatted = rec.lastSeenAt || rec.endedAt
+                      ? new Date(rec.lastSeenAt || rec.endedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                      : '—';
+                    const isLive = rec.isLiveNow || rec.status === 'ACTIVE';
+
+                    return (
+                      <tr key={rec._id || rec.eventId || i} className="hover:bg-slate-800/40 transition-colors group">
+                        {/* Application */}
+                        <td className="px-5 py-3.5">
+                          <div className="flex items-center gap-2.5">
+                            <div className={`p-1.5 rounded-lg border shrink-0 ${visuals.color}`}>
+                              <Icon className="w-3.5 h-3.5" />
+                            </div>
+                            <div className="min-w-0">
+                              <span className="font-bold text-white group-hover:text-indigo-300 transition-colors block truncate max-w-[180px]">
+                                {rec.applicationName}
+                              </span>
+                              {rec.processName && (
+                                <span className="text-[10px] text-slate-500 font-mono block">
+                                  {rec.processName}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* Category */}
+                        <td className="px-5 py-3.5">
+                          <span className="px-2.5 py-1 bg-slate-800/80 rounded-full text-[11px] font-semibold text-slate-300 border border-slate-700/60">
+                            {rec.category || 'Other'}
+                          </span>
+                        </td>
+
+                        {/* Employee */}
+                        <td className="px-5 py-3.5">
+                          <div>
+                            <span className="font-semibold text-white block">{empName}</span>
+                            <span className="text-[10px] text-slate-500">{rec.employeeId?.employeeCode || ''}</span>
+                          </div>
+                        </td>
+
+                        {/* Started */}
+                        <td className="px-5 py-3.5 font-mono text-slate-300">{startedFormatted}</td>
+
+                        {/* Last Seen */}
+                        <td className="px-5 py-3.5 font-mono text-slate-400">{lastSeenFormatted}</td>
+
+                        {/* Duration */}
+                        <td className="px-5 py-3.5 font-mono font-bold text-emerald-400">
+                          {formatDuration(rec.durationSeconds || rec.todayTotalSeconds || 0)}
+                        </td>
+
+                        {/* Status */}
+                        <td className="px-5 py-3.5">
+                          {isLive ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                              Active
+                            </span>
+                          ) : rec.type === 'IDLE_INTERVAL' || rec.status === 'IDLE' ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-400 border border-amber-500/30">
+                              Idle
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-800 text-slate-400 border border-slate-700">
+                              Completed
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </main>
 
       {/* Add Employee Modal */}
