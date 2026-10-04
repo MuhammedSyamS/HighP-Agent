@@ -8,7 +8,7 @@ const getApiBaseUrl = (): string => {
   if (typeof window !== 'undefined') {
     const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
     if (isLocalhost) {
-      return 'http://localhost:5000/api';
+      return 'http://localhost:5001/api';
     }
   }
   return 'https://highp-agent-backend.onrender.com/api';

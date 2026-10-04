@@ -18,30 +18,30 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
     switch (status) {
       case ActivityState.ACTIVE:
         return {
-          bg: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30 shadow-[0_0_12px_rgba(16,185,129,0.15)]',
-          dot: 'bg-emerald-400',
+          bg: 'bg-emerald-50 text-emerald-800 border-emerald-300/80 shadow-xs',
+          dot: 'bg-emerald-600',
           pulse: 'bg-emerald-400',
           label: 'Active'
         };
       case ActivityState.IDLE:
         return {
-          bg: 'bg-amber-500/15 text-amber-300 border-amber-500/30 shadow-[0_0_12px_rgba(245,158,11,0.15)]',
-          dot: 'bg-amber-400',
+          bg: 'bg-amber-50 text-amber-800 border-amber-300/80 shadow-xs',
+          dot: 'bg-amber-500',
           pulse: 'bg-amber-400',
           label: 'Idle'
         };
       case ActivityState.BREAK:
         return {
-          bg: 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30 shadow-[0_0_12px_rgba(6,182,212,0.15)]',
-          dot: 'bg-cyan-400',
+          bg: 'bg-cyan-50 text-cyan-800 border-cyan-300/80 shadow-xs',
+          dot: 'bg-cyan-600',
           pulse: 'bg-cyan-400',
           label: 'On Break'
         };
       case ActivityState.OFFLINE:
       default:
         return {
-          bg: 'bg-slate-800/60 text-slate-400 border-slate-700/60',
-          dot: 'bg-slate-500',
+          bg: 'bg-slate-100 text-slate-600 border-slate-200',
+          dot: 'bg-slate-400',
           pulse: '',
           label: 'Offline'
         };
@@ -52,8 +52,8 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
 
   const sizeClasses = {
     sm: 'px-2 py-0.5 text-[10px] gap-1',
-    md: 'px-2.5 py-1 text-xs gap-1.5',
-    lg: 'px-3 py-1.5 text-sm gap-2'
+    md: 'px-2.5 py-0.5 text-xs gap-1.5',
+    lg: 'px-3 py-1 text-sm gap-2'
   }[size];
 
   const dotSize = {
@@ -64,7 +64,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
 
   return (
     <span
-      className={`inline-flex items-center font-semibold rounded-full border backdrop-blur-xs transition-all ${style.bg} ${sizeClasses} ${className}`}
+      className={`inline-flex items-center font-bold rounded-full border transition-all ${style.bg} ${sizeClasses} ${className}`}
     >
       {showDot && (
         <span className="relative flex items-center justify-center">

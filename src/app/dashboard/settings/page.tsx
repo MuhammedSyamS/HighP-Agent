@@ -66,7 +66,7 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 bg-[#0B0F19] text-slate-100">
+    <div className="flex-1 flex flex-col min-h-0 bg-[#F8FAFC] text-slate-900 selection:bg-black selection:text-white">
       <Header
         title={activeTab === 'applications' ? 'Application Tracking' : 'Transparency Policy & Monitoring Settings'}
         description={
@@ -78,13 +78,13 @@ export default function SettingsPage() {
 
       <main className="p-4 sm:p-8 space-y-6 flex-1 overflow-y-auto max-w-6xl mx-auto w-full">
         {/* Navigation Tabs */}
-        <div className="flex items-center gap-2 border-b border-slate-800 pb-3">
+        <div className="flex items-center gap-2 border-b border-slate-200 pb-3">
           <button
             onClick={() => handleTabChange('applications')}
             className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
               activeTab === 'applications'
-                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                ? 'bg-black text-white shadow-sm'
+                : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200'
             }`}
           >
             <Layers className="w-4 h-4" /> Application Tracking
@@ -93,8 +93,8 @@ export default function SettingsPage() {
             onClick={() => handleTabChange('policy')}
             className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
               activeTab === 'policy'
-                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                ? 'bg-black text-white shadow-sm'
+                : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200'
             }`}
           >
             <ShieldCheck className="w-4 h-4" /> Transparency Policy & Cadence
@@ -108,27 +108,25 @@ export default function SettingsPage() {
         {activeTab === 'policy' && (
           <div className="space-y-6 max-w-4xl">
             {/* Transparency Charter Card */}
-            <div className="bg-gradient-to-r from-slate-900 via-indigo-950/60 to-slate-900 border border-indigo-500/30 rounded-2xl p-6 text-white shadow-xl relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
-
+            <div className="bg-white border border-slate-200/90 rounded-2xl p-6 text-slate-900 shadow-xs relative overflow-hidden">
               <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+                <div className="w-10 h-10 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-900">
                   <ShieldCheck className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-white">Workplace Privacy & Transparency Charter</h3>
-                  <p className="text-xs text-indigo-300">
+                  <h3 className="text-base font-bold text-slate-900">Workplace Privacy & Transparency Charter</h3>
+                  <p className="text-xs text-slate-500">
                     Ethical telemetry boundaries designed for productivity aggregation rather than surveillance
                   </p>
                 </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs mt-4">
-                <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-800">
-                  <span className="font-bold text-emerald-400 block mb-2 flex items-center gap-1.5">
+                <div className="bg-emerald-50/50 p-4 rounded-xl border border-emerald-200">
+                  <span className="font-bold text-emerald-800 block mb-2 flex items-center gap-1.5">
                     <CheckCircle2 className="w-4 h-4" /> Telemetry Collected
                   </span>
-                  <ul className="space-y-1.5 text-slate-300 text-[11px]">
+                  <ul className="space-y-1.5 text-emerald-900 text-[11px]">
                     <li>• Foreground active application name & process</li>
                     <li>• Work intervals & idle status switches</li>
                     <li>• Session start, stop & break timestamps</li>
@@ -136,11 +134,11 @@ export default function SettingsPage() {
                   </ul>
                 </div>
 
-                <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-800">
-                  <span className="font-bold text-rose-400 block mb-2 flex items-center gap-1.5">
+                <div className="bg-rose-50/50 p-4 rounded-xl border border-rose-200">
+                  <span className="font-bold text-rose-800 block mb-2 flex items-center gap-1.5">
                     <AlertCircle className="w-4 h-4" /> Strict Exclusions (Never Captured)
                   </span>
-                  <ul className="space-y-1.5 text-slate-300 text-[11px]">
+                  <ul className="space-y-1.5 text-rose-900 text-[11px]">
                     <li>• NO Keystrokes or Keylogging</li>
                     <li>• NO Passwords, Tokens, or Form Content</li>
                     <li>• NO Screen Recordings or Background Screenshots</li>
@@ -153,57 +151,57 @@ export default function SettingsPage() {
             {/* Configuration Form */}
             <form
               onSubmit={handleSave}
-              className="bg-slate-900/60 backdrop-blur-xl border border-slate-800/80 rounded-2xl p-6 shadow-xl space-y-6"
+              className="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-xs space-y-6"
             >
-              <div className="flex items-center justify-between pb-4 border-b border-slate-800">
+              <div className="flex items-center justify-between pb-4 border-b border-slate-100">
                 <div>
-                  <h3 className="text-base font-bold text-white">Agent Telemetry Rules</h3>
-                  <p className="text-xs text-slate-400 mt-0.5">Parameters broadcast to all registered employee desktop agents</p>
+                  <h3 className="text-base font-bold text-slate-900">Agent Telemetry Rules</h3>
+                  <p className="text-xs text-slate-500 mt-0.5">Parameters broadcast to all registered employee desktop agents</p>
                 </div>
                 {isSaved && (
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-300 text-xs font-semibold border border-emerald-500/30 shadow-[0_0_10px_rgba(16,185,129,0.15)]">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> Configuration Saved
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 text-xs font-semibold border border-emerald-200">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Configuration Saved
                   </span>
                 )}
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs">
                 <div>
-                  <label className="block font-bold text-white mb-1">Idle Threshold (Minutes)</label>
-                  <p className="text-slate-400 mb-2">Duration of zero OS keyboard/mouse input before switching to IDLE.</p>
+                  <label className="block font-bold text-slate-900 mb-1">Idle Threshold (Minutes)</label>
+                  <p className="text-slate-500 mb-2">Duration of zero OS keyboard/mouse input before switching to IDLE.</p>
                   <input
                     type="number"
                     min={1}
                     max={60}
                     value={config.idleThresholdMinutes}
                     onChange={(e) => setConfig({ ...config, idleThresholdMinutes: Number(e.target.value) })}
-                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 focus:border-indigo-500 rounded-xl font-semibold text-white focus:outline-none transition-colors"
+                    className="w-full px-3.5 py-2.5 bg-white border border-slate-200 focus:ring-1 focus:ring-black focus:border-black rounded-xl font-semibold text-slate-900 focus:outline-none transition-colors"
                   />
                 </div>
 
                 <div>
-                  <label className="block font-bold text-white mb-1">Heartbeat Cadence (Seconds)</label>
-                  <p className="text-slate-400 mb-2">Interval at which desktop agents emit presence updates to backend.</p>
+                  <label className="block font-bold text-slate-900 mb-1">Heartbeat Cadence (Seconds)</label>
+                  <p className="text-slate-500 mb-2">Interval at which desktop agents emit presence updates to backend.</p>
                   <input
                     type="number"
                     min={5}
                     max={300}
                     value={config.heartbeatIntervalSeconds}
                     onChange={(e) => setConfig({ ...config, heartbeatIntervalSeconds: Number(e.target.value) })}
-                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 focus:border-indigo-500 rounded-xl font-semibold text-white focus:outline-none transition-colors"
+                    className="w-full px-3.5 py-2.5 bg-white border border-slate-200 focus:ring-1 focus:ring-black focus:border-black rounded-xl font-semibold text-slate-900 focus:outline-none transition-colors"
                   />
                 </div>
 
                 <div>
-                  <label className="block font-bold text-white mb-1">Data Retention Period (Days)</label>
-                  <p className="text-slate-400 mb-2">Number of days raw activity timeline events are retained.</p>
+                  <label className="block font-bold text-slate-900 mb-1">Data Retention Period (Days)</label>
+                  <p className="text-slate-500 mb-2">Number of days raw activity timeline events are retained.</p>
                   <input
                     type="number"
                     min={7}
                     max={3650}
                     value={config.retentionDays}
                     onChange={(e) => setConfig({ ...config, retentionDays: Number(e.target.value) })}
-                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 focus:border-indigo-500 rounded-xl font-semibold text-white focus:outline-none transition-colors"
+                    className="w-full px-3.5 py-2.5 bg-white border border-slate-200 focus:ring-1 focus:ring-black focus:border-black rounded-xl font-semibold text-slate-900 focus:outline-none transition-colors"
                   />
                 </div>
 
@@ -213,18 +211,18 @@ export default function SettingsPage() {
                     id="allowBreaks"
                     checked={config.allowManualBreaks}
                     onChange={(e) => setConfig({ ...config, allowManualBreaks: e.target.checked })}
-                    className="w-4 h-4 text-indigo-600 bg-slate-950 border-slate-800 rounded focus:ring-0 focus:ring-offset-0 cursor-pointer"
+                    className="w-4 h-4 text-black border-slate-300 rounded focus:ring-black cursor-pointer"
                   />
-                  <label htmlFor="allowBreaks" className="font-semibold text-slate-200 cursor-pointer select-none">
+                  <label htmlFor="allowBreaks" className="font-semibold text-slate-700 cursor-pointer select-none">
                     Allow Employees to Manually Trigger Breaks (Lunch, Coffee, Meeting)
                   </label>
                 </div>
               </div>
 
-              <div className="pt-4 border-t border-slate-800 flex justify-end">
+              <div className="pt-4 border-t border-slate-100 flex justify-end">
                 <button
                   type="submit"
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-lg shadow-indigo-600/30 transition-all hover:scale-105"
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-black hover:bg-slate-800 text-white font-bold text-xs shadow-sm transition-all hover:scale-105"
                 >
                   <Save className="w-4 h-4" /> Save Configuration
                 </button>

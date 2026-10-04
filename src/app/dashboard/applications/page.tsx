@@ -54,40 +54,40 @@ export default function ApplicationsPage() {
   });
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 bg-[#0B0F19] text-slate-100">
+    <div className="flex-1 flex flex-col min-h-0 bg-[#F8FAFC] text-slate-900 selection:bg-black selection:text-white">
       <Header
         title="Application & Website Analytics"
         description="Company-wide software usage distribution, active website durations, and category breakdowns."
         actions={
           <div className="flex items-center gap-3">
             <div className="relative flex items-center">
-              <Calendar className="w-3.5 h-3.5 text-slate-400 absolute left-3 pointer-events-none" />
+              <Calendar className="w-3.5 h-3.5 text-slate-500 absolute left-3 pointer-events-none" />
               <input
                 type="date"
                 value={dateStr}
                 onChange={(e) => setDateStr(e.target.value)}
-                className="pl-8 pr-3 py-1.5 bg-slate-900/80 border border-slate-700/80 rounded-xl text-xs font-semibold text-slate-200 shadow-sm focus:outline-none focus:border-indigo-500 transition-colors"
+                className="pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 shadow-xs focus:outline-none focus:ring-1 focus:ring-black focus:border-black transition-colors"
               />
             </div>
           </div>
         }
       />
 
-      <main className="p-6 md:p-8 space-y-6 md:space-y-8 flex-1 overflow-y-auto">
+      <main className="p-6 md:p-8 space-y-6 md:space-y-8 flex-1 overflow-y-auto max-w-7xl mx-auto w-full">
         {/* Navigation Tabs */}
-        <div className="flex items-center gap-2 border-b border-slate-800 pb-3">
+        <div className="flex items-center gap-2 border-b border-slate-200 pb-3">
           <button
             onClick={() => setActiveTab('applications')}
             className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
               activeTab === 'applications'
-                ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60'
+                ? 'bg-black text-white shadow-sm'
+                : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200'
             }`}
           >
             <Monitor className="w-4 h-4" />
             <span>Applications</span>
             <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-              activeTab === 'applications' ? 'bg-indigo-800 text-indigo-200' : 'bg-slate-800 text-slate-400'
+              activeTab === 'applications' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'
             }`}>
               {appsData.length}
             </span>
@@ -97,14 +97,14 @@ export default function ApplicationsPage() {
             onClick={() => setActiveTab('websites')}
             className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
               activeTab === 'websites'
-                ? 'bg-cyan-600 text-white shadow-lg shadow-cyan-600/30'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60'
+                ? 'bg-black text-white shadow-sm'
+                : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200'
             }`}
           >
             <Globe className="w-4 h-4" />
             <span>Websites</span>
             <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-              activeTab === 'websites' ? 'bg-cyan-800 text-cyan-200' : 'bg-slate-800 text-slate-400'
+              activeTab === 'websites' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'
             }`}>
               {websitesData.length}
             </span>
@@ -116,7 +116,7 @@ export default function ApplicationsPage() {
             {/* Category Distribution Grid */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {Object.keys(categorySummary).length === 0 ? (
-                <div className="col-span-full bg-slate-900/40 border border-slate-800 rounded-2xl p-6 text-center text-slate-500 text-xs">
+                <div className="col-span-full bg-white border border-slate-200 rounded-2xl p-6 text-center text-slate-500 text-xs shadow-xs">
                   No category aggregates available for this date.
                 </div>
               ) : (
@@ -125,25 +125,23 @@ export default function ApplicationsPage() {
                   return (
                     <div
                       key={i}
-                      className="bg-slate-900/60 backdrop-blur-xl border border-slate-800/80 hover:border-slate-700/80 rounded-2xl p-5 shadow-lg relative overflow-hidden group transition-all"
+                      className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-xs relative overflow-hidden group hover:border-slate-300 transition-all"
                     >
-                      <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-500/5 rounded-full blur-2xl pointer-events-none group-hover:bg-indigo-500/10 transition-all" />
-
                       <div className="flex items-center justify-between">
-                        <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">{catName}</span>
-                        <div className="w-7 h-7 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">{catName}</span>
+                        <div className="w-7 h-7 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-800">
                           <Layers className="w-3.5 h-3.5" />
                         </div>
                       </div>
-                      <h3 className="text-xl font-black text-white mt-2 tracking-tight">{formatDuration(data.seconds)}</h3>
-                      <div className="flex items-center justify-between text-xs text-slate-400 mt-2 font-medium">
+                      <h3 className="text-xl font-black text-slate-900 mt-2 tracking-tight">{formatDuration(data.seconds)}</h3>
+                      <div className="flex items-center justify-between text-xs text-slate-500 mt-2 font-medium">
                         <span>{data.count} Applications</span>
-                        <span className="text-indigo-400 font-bold">{pct}%</span>
+                        <span className="text-slate-900 font-bold">{pct}%</span>
                       </div>
 
-                      <div className="mt-3 w-full h-1.5 bg-slate-950 rounded-full overflow-hidden">
+                      <div className="mt-3 w-full h-1.5 bg-slate-100 rounded-full overflow-hidden border border-slate-200">
                         <div
-                          className="h-full bg-gradient-to-r from-indigo-500 to-violet-500 rounded-full transition-all duration-500"
+                          className="h-full bg-black rounded-full transition-all duration-500"
                           style={{ width: `${pct}%` }}
                         />
                       </div>
@@ -154,25 +152,25 @@ export default function ApplicationsPage() {
             </div>
 
             {/* Applications Ranking Table */}
-            <div className="bg-slate-900/60 backdrop-blur-xl border border-slate-800/80 rounded-2xl shadow-xl overflow-hidden">
-              <div className="p-5 border-b border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-950/40">
+            <div className="bg-white border border-slate-200/90 rounded-2xl shadow-xs overflow-hidden">
+              <div className="p-5 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/60">
                 <div>
                   <div className="flex items-center gap-2">
-                    <h3 className="text-base font-bold text-white">Application Telemetry Ranking</h3>
-                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                    <h3 className="text-base font-bold text-slate-900">Application Telemetry Ranking</h3>
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-200 text-slate-800">
                       {appsData.length} Discovered
                     </span>
                   </div>
-                  <p className="text-xs text-slate-400 mt-0.5">Ranked by total company-wide aggregate active time on {dateStr}</p>
+                  <p className="text-xs text-slate-500 mt-0.5">Ranked by total company-wide aggregate active time on {dateStr}</p>
                 </div>
-                <span className="text-xs font-semibold px-3 py-1 bg-slate-800/80 border border-slate-700/80 rounded-xl text-slate-300 self-start sm:self-auto">
-                  Total Recorded Time: <strong className="text-white ml-1">{formatDuration(totalTime)}</strong>
+                <span className="text-xs font-semibold px-3 py-1 bg-white border border-slate-200 rounded-xl text-slate-700 self-start sm:self-auto shadow-2xs">
+                  Total Recorded Time: <strong className="text-emerald-700 ml-1 font-mono">{formatDuration(totalTime)}</strong>
                 </span>
               </div>
 
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-950/80 text-slate-400 font-bold uppercase tracking-wider border-b border-slate-800">
+                  <thead className="bg-slate-50 text-slate-500 font-bold uppercase tracking-wider border-b border-slate-200 text-[11px]">
                     <tr>
                       <th className="px-6 py-3.5">Application</th>
                       <th className="px-6 py-3.5">Category</th>
@@ -182,11 +180,11 @@ export default function ApplicationsPage() {
                       <th className="px-6 py-3.5">Last Detected</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-800/50 font-medium text-slate-300">
+                  <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
                     {appsData.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="px-6 py-14 text-center text-slate-500">
-                          <Monitor className="w-8 h-8 text-slate-600 mx-auto mb-2 opacity-50" />
+                        <td colSpan={6} className="px-6 py-14 text-center text-slate-400">
+                          <Monitor className="w-8 h-8 text-slate-400 mx-auto mb-2 opacity-50" />
                           No application telemetry usage recorded for {dateStr}.
                         </td>
                       </tr>
@@ -197,43 +195,43 @@ export default function ApplicationsPage() {
                           : '—';
 
                         return (
-                          <tr key={idx} className="hover:bg-slate-800/40 transition-colors group">
+                          <tr key={idx} className="hover:bg-slate-50/70 transition-colors group">
                             <td className="px-6 py-4">
                               <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 font-bold flex items-center justify-center text-xs group-hover:border-indigo-500/40 transition-colors">
+                                <div className="w-8 h-8 rounded-lg bg-slate-100 border border-slate-200 text-slate-800 font-bold flex items-center justify-center text-xs">
                                   <Monitor className="w-4 h-4" />
                                 </div>
-                                <span className="font-bold text-white group-hover:text-indigo-300 transition-colors">
+                                <span className="font-bold text-slate-900">
                                   {app.applicationName}
                                 </span>
                               </div>
                             </td>
                             <td className="px-6 py-4">
-                              <span className="px-2.5 py-1 bg-slate-800/70 rounded-full text-[11px] font-semibold text-slate-300 border border-slate-700/60">
+                              <span className="px-2.5 py-1 bg-slate-100 rounded-full text-[11px] font-semibold text-slate-700 border border-slate-200">
                                 {app.category || 'Other'}
                               </span>
                             </td>
-                            <td className="px-6 py-4 font-bold text-white">
+                            <td className="px-6 py-4 font-bold text-slate-900 font-mono">
                               {formatDuration(app.totalSeconds)}
                             </td>
                             <td className="px-6 py-4">
                               <div className="flex items-center gap-3 max-w-[150px]">
-                                <div className="flex-1 h-2 bg-slate-950 rounded-full overflow-hidden border border-slate-800">
+                                <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden border border-slate-200">
                                   <div
-                                    className="h-full bg-gradient-to-r from-indigo-500 to-violet-500 rounded-full"
+                                    className="h-full bg-black rounded-full"
                                     style={{ width: `${app.percentage}%` }}
                                   />
                                 </div>
-                                <span className="font-semibold text-indigo-400 text-[11px]">{app.percentage}%</span>
+                                <span className="font-semibold text-slate-900 text-[11px]">{app.percentage}%</span>
                               </div>
                             </td>
-                            <td className="px-6 py-4 text-slate-300">
+                            <td className="px-6 py-4 text-slate-600">
                               <div className="flex items-center gap-1.5">
-                                <Users className="w-3.5 h-3.5 text-slate-500" />
+                                <Users className="w-3.5 h-3.5 text-slate-400" />
                                 <span>{app.employeeCount || 1} members</span>
                               </div>
                             </td>
-                            <td className="px-6 py-4 text-slate-400 font-mono text-[11px]">{lastDetected}</td>
+                            <td className="px-6 py-4 text-slate-500 font-mono text-[11px]">{lastDetected}</td>
                           </tr>
                         );
                       })
@@ -245,25 +243,25 @@ export default function ApplicationsPage() {
           </>
         ) : (
           /* Websites Tab View */
-          <div className="bg-slate-900/60 backdrop-blur-xl border border-slate-800/80 rounded-2xl shadow-xl overflow-hidden">
-            <div className="p-5 border-b border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-950/40">
+          <div className="bg-white border border-slate-200/90 rounded-2xl shadow-xs overflow-hidden">
+            <div className="p-5 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/60">
               <div>
                 <div className="flex items-center gap-2">
-                  <h3 className="text-base font-bold text-white">Website Domain Telemetry Ranking</h3>
-                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+                  <h3 className="text-base font-bold text-slate-900">Website Domain Telemetry Ranking</h3>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-cyan-50 text-cyan-800 border border-cyan-200">
                     {websitesData.length} Visited Domains
                   </span>
                 </div>
-                <p className="text-xs text-slate-400 mt-0.5">Ranked by total company-wide aggregate active time on {dateStr}</p>
+                <p className="text-xs text-slate-500 mt-0.5">Ranked by total company-wide aggregate active time on {dateStr}</p>
               </div>
-              <span className="text-xs font-semibold px-3 py-1 bg-slate-800/80 border border-slate-700/80 rounded-xl text-slate-300 self-start sm:self-auto">
-                Total Website Time: <strong className="text-white ml-1">{formatDuration(totalWebTime)}</strong>
+              <span className="text-xs font-semibold px-3 py-1 bg-white border border-slate-200 rounded-xl text-slate-700 self-start sm:self-auto shadow-2xs">
+                Total Website Time: <strong className="text-cyan-800 ml-1 font-mono">{formatDuration(totalWebTime)}</strong>
               </span>
             </div>
 
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
-                <thead className="bg-slate-950/80 text-slate-400 font-bold uppercase tracking-wider border-b border-slate-800">
+                <thead className="bg-slate-50 text-slate-500 font-bold uppercase tracking-wider border-b border-slate-200 text-[11px]">
                   <tr>
                     <th className="px-6 py-3.5">Website Domain</th>
                     <th className="px-6 py-3.5">Browser</th>
@@ -273,13 +271,13 @@ export default function ApplicationsPage() {
                     <th className="px-6 py-3.5">Last Visited</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-800/50 font-medium text-slate-300">
+                <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
                   {websitesData.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="px-6 py-14 text-center text-slate-500">
-                        <Globe className="w-8 h-8 text-slate-600 mx-auto mb-2 opacity-50" />
+                      <td colSpan={6} className="px-6 py-14 text-center text-slate-400">
+                        <Globe className="w-8 h-8 text-slate-400 mx-auto mb-2 opacity-50" />
                         No website telemetry usage recorded for {dateStr}.
-                        <p className="text-[11px] text-slate-600 mt-1">Make sure the HighP Chrome / Brave Extension is installed and active.</p>
+                        <p className="text-[11px] text-slate-500 mt-1">Make sure the HighP Chrome / Brave Extension is installed and active.</p>
                       </td>
                     </tr>
                   ) : (
@@ -289,43 +287,43 @@ export default function ApplicationsPage() {
                         : '—';
 
                       return (
-                        <tr key={idx} className="hover:bg-slate-800/40 transition-colors group">
+                        <tr key={idx} className="hover:bg-slate-50/70 transition-colors group">
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 rounded-lg bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 font-bold flex items-center justify-center text-xs group-hover:border-cyan-500/40 transition-colors">
+                              <div className="w-8 h-8 rounded-lg bg-cyan-50 border border-cyan-200 text-cyan-700 font-bold flex items-center justify-center text-xs">
                                 <Globe className="w-4 h-4" />
                               </div>
-                              <span className="font-bold text-white group-hover:text-cyan-300 transition-colors font-mono">
+                              <span className="font-bold text-slate-900 font-mono">
                                 {web.domain}
                               </span>
                             </div>
                           </td>
                           <td className="px-6 py-4">
-                            <span className="px-2.5 py-1 bg-slate-800/70 rounded-full text-[11px] font-semibold text-slate-300 border border-slate-700/60">
+                            <span className="px-2.5 py-1 bg-slate-100 rounded-full text-[11px] font-semibold text-slate-700 border border-slate-200">
                               {web.browser || 'Web Browser'}
                             </span>
                           </td>
-                          <td className="px-6 py-4 font-bold text-white">
+                          <td className="px-6 py-4 font-bold text-slate-900 font-mono">
                             {formatDuration(web.totalSeconds)}
                           </td>
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-3 max-w-[150px]">
-                              <div className="flex-1 h-2 bg-slate-950 rounded-full overflow-hidden border border-slate-800">
+                              <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden border border-slate-200">
                                 <div
-                                  className="h-full bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full"
+                                  className="h-full bg-cyan-700 rounded-full"
                                   style={{ width: `${web.percentage}%` }}
                                 />
                               </div>
-                              <span className="font-semibold text-cyan-400 text-[11px]">{web.percentage}%</span>
+                              <span className="font-semibold text-slate-900 text-[11px]">{web.percentage}%</span>
                             </div>
                           </td>
-                          <td className="px-6 py-4 text-slate-300">
+                          <td className="px-6 py-4 text-slate-600">
                             <div className="flex items-center gap-1.5">
-                              <Users className="w-3.5 h-3.5 text-slate-500" />
+                              <Users className="w-3.5 h-3.5 text-slate-400" />
                               <span>{web.employeeCount || 1} members</span>
                             </div>
                           </td>
-                          <td className="px-6 py-4 text-slate-400 font-mono text-[11px]">{lastDetected}</td>
+                          <td className="px-6 py-4 text-slate-500 font-mono text-[11px]">{lastDetected}</td>
                         </tr>
                       );
                     })
