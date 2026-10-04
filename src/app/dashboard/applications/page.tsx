@@ -75,19 +75,19 @@ export default function ApplicationsPage() {
 
       <main className="p-6 md:p-8 space-y-6 md:space-y-8 flex-1 overflow-y-auto max-w-7xl mx-auto w-full">
         {/* Navigation Tabs */}
-        <div className="flex items-center gap-2 border-b border-slate-200 pb-3">
+        <div className="bg-slate-200/60 p-1.5 rounded-2xl inline-flex items-center gap-1 w-full sm:w-auto">
           <button
             onClick={() => setActiveTab('applications')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all ${
               activeTab === 'applications'
-                ? 'bg-black text-white shadow-sm'
-                : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200'
+                ? 'bg-white text-slate-900 shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
             }`}
           >
-            <Monitor className="w-4 h-4" />
+            <Monitor className="w-4 h-4 text-indigo-600" />
             <span>Applications</span>
             <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-              activeTab === 'applications' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'
+              activeTab === 'applications' ? 'bg-indigo-50 text-indigo-700' : 'bg-slate-200/80 text-slate-600'
             }`}>
               {appsData.length}
             </span>
@@ -95,16 +95,16 @@ export default function ApplicationsPage() {
 
           <button
             onClick={() => setActiveTab('websites')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all ${
               activeTab === 'websites'
-                ? 'bg-black text-white shadow-sm'
-                : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200'
+                ? 'bg-white text-slate-900 shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
             }`}
           >
-            <Globe className="w-4 h-4" />
+            <Globe className="w-4 h-4 text-cyan-600" />
             <span>Websites</span>
             <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-              activeTab === 'websites' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'
+              activeTab === 'websites' ? 'bg-cyan-50 text-cyan-700' : 'bg-slate-200/80 text-slate-600'
             }`}>
               {websitesData.length}
             </span>
@@ -141,7 +141,7 @@ export default function ApplicationsPage() {
 
                       <div className="mt-3 w-full h-1.5 bg-slate-100 rounded-full overflow-hidden border border-slate-200">
                         <div
-                          className="h-full bg-black rounded-full transition-all duration-500"
+                          className="h-full bg-indigo-600 rounded-full transition-all duration-500"
                           style={{ width: `${pct}%` }}
                         />
                       </div>
@@ -218,7 +218,7 @@ export default function ApplicationsPage() {
                               <div className="flex items-center gap-3 max-w-[150px]">
                                 <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden border border-slate-200">
                                   <div
-                                    className="h-full bg-black rounded-full"
+                                    className="h-full bg-indigo-600 rounded-full"
                                     style={{ width: `${app.percentage}%` }}
                                   />
                                 </div>

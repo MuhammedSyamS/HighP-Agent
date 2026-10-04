@@ -48,7 +48,7 @@ export const Sidebar: React.FC = () => {
       <aside className="hidden md:flex w-64 bg-white text-slate-800 flex-col min-h-screen border-r border-slate-200 shrink-0">
         {/* Brand */}
         <div className="p-5 border-b border-slate-200 flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-black flex items-center justify-center text-white font-black text-lg shadow-sm">
+          <div className="w-9 h-9 rounded-xl bg-indigo-600 flex items-center justify-center text-white font-black text-lg shadow-sm shadow-indigo-600/25">
             ⚡
           </div>
           <div className="min-w-0">
@@ -74,11 +74,11 @@ export const Sidebar: React.FC = () => {
                 to={item.href}
                 className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all ${
                   isActive
-                    ? 'bg-black text-white shadow-sm'
-                    : 'text-slate-600 hover:text-black hover:bg-slate-100'
+                    ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/25'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
                 }`}
               >
-                <Icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-slate-500'}`} />
+                <Icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-slate-400'}`} />
                 <span>{item.name}</span>
               </Link>
             );
@@ -169,8 +169,8 @@ export const Sidebar: React.FC = () => {
                       onClick={() => setMobileMenuOpen(false)}
                       className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-colors ${
                         isActive
-                          ? 'bg-black text-white'
-                          : 'text-slate-600 hover:bg-slate-100 hover:text-black'
+                          ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/25'
+                          : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
                       }`}
                     >
                       <Icon className="w-4 h-4" />

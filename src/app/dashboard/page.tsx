@@ -38,7 +38,8 @@ import {
   MessageSquare,
   FileSpreadsheet,
   Compass,
-  Cpu
+  Cpu,
+  PieChart
 } from 'lucide-react';
 import { ActivityState, IDashboardOverview, UserRole } from '@highp/shared';
 
@@ -116,6 +117,7 @@ export default function DashboardOverviewPage() {
   const [departmentFilter, setDepartmentFilter] = useState<string>('ALL');
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
+  const [dashboardTab, setDashboardTab] = useState<'employees' | 'apps' | 'activity'>('employees');
   const [isLoading, setLoading] = useState(true);
 
   // Live Stream Events Feed
@@ -515,30 +517,30 @@ export default function DashboardOverviewPage() {
   );
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 bg-[#F8FAFC] text-slate-900 selection:bg-black selection:text-white">
+    <div className="flex-1 flex flex-col min-h-0 bg-[#F8FAFC] text-slate-900 selection:bg-indigo-600 selection:text-white">
       <Header
-        title="Workforce Intelligence Hub"
-        description="Real-time employee presence, foreground workstation applications, and telemetry analytics."
+        title="Executive Intelligence Dashboard"
+        description="Real-time workforce presence, foreground workstation applications, and telemetry analytics."
         actions={
           <div className="flex items-center gap-2.5">
             <a
               href={getDesktopAgentDownloadUrl()}
               target="_blank"
               rel="noopener noreferrer"
-              className="hidden lg:inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white hover:bg-slate-50 text-slate-800 border border-slate-200 text-xs font-semibold transition-all shadow-sm"
+              className="hidden lg:inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 border border-slate-200 text-xs font-semibold transition-all shadow-2xs hover:border-slate-300"
               title="Download Desktop Telemetry Agent"
             >
-              <Download className="w-3.5 h-3.5 text-slate-600" /> Desktop Agent (.exe)
+              <Download className="w-3.5 h-3.5 text-indigo-600" /> Desktop Agent (.exe)
             </a>
             <Link
               to="/dashboard/reports"
-              className="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white hover:bg-slate-50 text-slate-800 border border-slate-200 text-xs font-semibold transition-all shadow-sm"
+              className="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 border border-slate-200 text-xs font-semibold transition-all shadow-2xs hover:border-slate-300"
             >
-              <TrendingUp className="w-3.5 h-3.5 text-slate-600" /> Export Reports
+              <TrendingUp className="w-3.5 h-3.5 text-slate-500" /> Export Reports
             </Link>
             <button
               onClick={() => setIsAddModalOpen(true)}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-black hover:bg-slate-800 text-white font-bold text-xs shadow-sm transition-all hover:scale-[1.02] active:scale-[0.98]"
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 hover:bg-black text-white font-bold text-xs shadow-sm hover:shadow transition-all hover:scale-[1.02] active:scale-[0.98]"
             >
               <UserPlus className="w-3.5 h-3.5" /> Add Team Member
             </button>
@@ -546,141 +548,205 @@ export default function DashboardOverviewPage() {
         }
       />
 
-      <main className="p-4 sm:p-8 space-y-6 sm:space-y-8 flex-1 overflow-y-auto max-w-7xl mx-auto w-full">
-        {/* Executive KPI Metrics */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
-          {/* Card 1: Active Workforce Pulse */}
-          <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-sm transition-all hover:border-slate-300">
+      <main className="p-4 sm:p-8 space-y-7 flex-1 overflow-y-auto max-w-7xl mx-auto w-full">
+        {/* Executive KPI Metrics Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+          {/* Card 1: Active Workforce */}
+          <div className="bg-white border border-slate-200/90 rounded-3xl p-6 shadow-xs hover:border-indigo-200 hover:shadow-md transition-all group">
             <div className="flex items-start justify-between">
               <div>
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block">
-                  Workforce Active Now
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">
+                  Active Workforce
                 </span>
-                <div className="flex items-baseline gap-2 mt-1.5">
-                  <h3 className="text-3xl font-black text-slate-900 font-sans tracking-tight">
+                <div className="flex items-baseline gap-2 mt-2">
+                  <h3 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
                     {overview.activeNow}
                   </h3>
-                  <span className="text-xs font-semibold text-slate-500">
-                    / {overview.totalEmployees} Total
+                  <span className="text-xs font-medium text-slate-500">
+                    / {overview.totalEmployees} registered
                   </span>
                 </div>
-                <div className="mt-2.5 flex items-center gap-2">
-                  <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-800 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                    {activeRatio}% Productive
+                <div className="mt-3.5 flex items-center gap-2">
+                  <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                    {activeRatio}% Active Ratio
                   </span>
-                  <span className="text-[11px] text-slate-500 font-medium">live efficiency</span>
                 </div>
               </div>
-              <div className="w-11 h-11 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-700 shrink-0">
-                <Activity className="w-5 h-5" />
+              <div className="w-12 h-12 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600 shrink-0 group-hover:scale-105 transition-transform">
+                <Users className="w-6 h-6" />
               </div>
             </div>
           </div>
 
-          {/* Card 2: Presence Matrix */}
-          <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-sm transition-all hover:border-slate-300">
-            <div className="flex items-start justify-between">
-              <div className="w-full">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block">
-                  Presence Distribution
-                </span>
-                <div className="mt-3 grid grid-cols-4 gap-1.5 text-center">
-                  <div className="bg-emerald-50/70 p-2 rounded-xl border border-emerald-200">
-                    <span className="text-sm font-extrabold text-emerald-800 block">{overview.activeNow}</span>
-                    <span className="text-[9px] uppercase tracking-wider text-emerald-700 font-semibold">Active</span>
-                  </div>
-                  <div className="bg-amber-50/70 p-2 rounded-xl border border-amber-200">
-                    <span className="text-sm font-extrabold text-amber-800 block">{overview.idleNow}</span>
-                    <span className="text-[9px] uppercase tracking-wider text-amber-700 font-semibold">Idle</span>
-                  </div>
-                  <div className="bg-sky-50/70 p-2 rounded-xl border border-sky-200">
-                    <span className="text-sm font-extrabold text-sky-800 block">{overview.onBreakNow}</span>
-                    <span className="text-[9px] uppercase tracking-wider text-sky-700 font-semibold">Break</span>
-                  </div>
-                  <div className="bg-slate-100 p-2 rounded-xl border border-slate-200">
-                    <span className="text-sm font-extrabold text-slate-700 block">{overview.offlineNow}</span>
-                    <span className="text-[9px] uppercase tracking-wider text-slate-500 font-semibold">Offline</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Card 3: Accumulated Active Hours */}
-          <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-sm transition-all hover:border-slate-300">
+          {/* Card 2: Total Active Work Time */}
+          <div className="bg-white border border-slate-200/90 rounded-3xl p-6 shadow-xs hover:border-indigo-200 hover:shadow-md transition-all group">
             <div className="flex items-start justify-between">
               <div>
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">
                   Total Active Time Today
                 </span>
-                <h3 className="text-3xl font-black text-slate-900 font-sans tracking-tight mt-1.5">
+                <h3 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight mt-2 font-mono">
                   {formatDuration(overview.totalActiveSecondsToday)}
                 </h3>
-                <div className="mt-2.5 flex items-center gap-2 text-[11px] font-medium">
-                  <span className="text-amber-700 font-semibold">Idle: {formatDuration(overview.totalIdleSecondsToday)}</span>
-                  <span className="text-slate-300">•</span>
-                  <span className="text-sky-700 font-semibold">Break: {formatDuration(overview.totalBreakSecondsToday)}</span>
+                <div className="mt-3.5 flex items-center gap-3 text-xs">
+                  <span className="flex items-center gap-1.5 font-medium text-amber-700">
+                    <span className="w-2 h-2 rounded-full bg-amber-400" />
+                    Idle: <strong className="font-mono">{formatDuration(overview.totalIdleSecondsToday)}</strong>
+                  </span>
+                  <span className="flex items-center gap-1.5 font-medium text-sky-700">
+                    <span className="w-2 h-2 rounded-full bg-sky-400" />
+                    Break: <strong className="font-mono">{formatDuration(overview.totalBreakSecondsToday)}</strong>
+                  </span>
                 </div>
               </div>
-              <div className="w-11 h-11 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-800 shrink-0">
-                <Clock className="w-5 h-5" />
+              <div className="w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-200 flex items-center justify-center text-indigo-600 shrink-0 group-hover:scale-105 transition-transform">
+                <Clock className="w-6 h-6" />
               </div>
             </div>
           </div>
 
-          {/* Card 4: Desktop Agent Hub */}
-          <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-sm transition-all hover:border-slate-300">
-            <div className="flex items-start justify-between">
-              <div>
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-900 block">
-                  Workstation Agent Hub
-                </span>
-                <p className="text-xs text-slate-600 mt-1 font-medium">
-                  Native Windows Telemetry v1.0.0
-                </p>
-                <div className="mt-3 flex items-center gap-2.5">
-                  <a
-                    href={getDesktopAgentDownloadUrl()}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-black hover:bg-slate-800 text-white font-bold text-xs shadow-sm transition-all hover:scale-105"
-                  >
-                    <Download className="w-3.5 h-3.5" /> Download (.exe)
-                  </a>
-                  <span className="text-[10px] text-emerald-700 font-bold flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                    Auto Win32
+          {/* Card 3: Live Presence Breakdown */}
+          <div className="bg-white border border-slate-200/90 rounded-3xl p-6 shadow-xs hover:border-indigo-200 hover:shadow-md transition-all">
+            <div>
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">
+                Workforce Presence
+              </span>
+
+              {/* Segmented ratio bar */}
+              <div className="w-full h-2 rounded-full bg-slate-100 flex overflow-hidden mt-3 mb-3.5 gap-0.5">
+                <div
+                  style={{ width: `${overview.totalEmployees > 0 ? (overview.activeNow / overview.totalEmployees) * 100 : 0}%` }}
+                  className="bg-emerald-500 transition-all duration-500"
+                  title="Active"
+                />
+                <div
+                  style={{ width: `${overview.totalEmployees > 0 ? (overview.idleNow / overview.totalEmployees) * 100 : 0}%` }}
+                  className="bg-amber-400 transition-all duration-500"
+                  title="Idle"
+                />
+                <div
+                  style={{ width: `${overview.totalEmployees > 0 ? (overview.onBreakNow / overview.totalEmployees) * 100 : 0}%` }}
+                  className="bg-sky-500 transition-all duration-500"
+                  title="Break"
+                />
+                <div
+                  style={{ width: `${overview.totalEmployees > 0 ? (overview.offlineNow / overview.totalEmployees) * 100 : 100}%` }}
+                  className="bg-slate-300 transition-all duration-500"
+                  title="Offline"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="flex items-center justify-between px-2.5 py-1 rounded-xl bg-slate-50 border border-slate-100">
+                  <span className="flex items-center gap-1.5 text-slate-600 font-semibold text-[11px]">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500" /> Active
                   </span>
+                  <span className="font-bold text-slate-900">{overview.activeNow}</span>
+                </div>
+                <div className="flex items-center justify-between px-2.5 py-1 rounded-xl bg-slate-50 border border-slate-100">
+                  <span className="flex items-center gap-1.5 text-slate-600 font-semibold text-[11px]">
+                    <span className="w-2 h-2 rounded-full bg-amber-400" /> Idle
+                  </span>
+                  <span className="font-bold text-slate-900">{overview.idleNow}</span>
+                </div>
+                <div className="flex items-center justify-between px-2.5 py-1 rounded-xl bg-slate-50 border border-slate-100">
+                  <span className="flex items-center gap-1.5 text-slate-600 font-semibold text-[11px]">
+                    <span className="w-2 h-2 rounded-full bg-sky-500" /> Break
+                  </span>
+                  <span className="font-bold text-slate-900">{overview.onBreakNow}</span>
+                </div>
+                <div className="flex items-center justify-between px-2.5 py-1 rounded-xl bg-slate-50 border border-slate-100">
+                  <span className="flex items-center gap-1.5 text-slate-400 font-semibold text-[11px]">
+                    <span className="w-2 h-2 rounded-full bg-slate-300" /> Offline
+                  </span>
+                  <span className="font-bold text-slate-500">{overview.offlineNow}</span>
                 </div>
               </div>
-              <div className="w-11 h-11 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-800 shrink-0">
-                <Laptop className="w-5 h-5" />
+            </div>
+          </div>
+
+          {/* Card 4: Workforce Productivity Index */}
+          <div className="bg-white border border-slate-200/90 rounded-3xl p-6 shadow-xs hover:border-indigo-200 hover:shadow-md transition-all group">
+            <div className="flex items-start justify-between">
+              <div>
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">
+                  Productivity Velocity
+                </span>
+                <div className="flex items-baseline gap-2 mt-2">
+                  <h3 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
+                    {activeRatio}%
+                  </h3>
+                  <span className="text-xs font-semibold text-indigo-600">
+                    {activeRatio >= 75 ? 'Optimal' : activeRatio >= 40 ? 'Moderate' : 'Ramping up'}
+                  </span>
+                </div>
+                <div className="w-full bg-slate-100 h-2 rounded-full mt-3.5 overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-indigo-500 to-indigo-600 rounded-full transition-all duration-500"
+                    style={{ width: `${Math.min(100, activeRatio)}%` }}
+                  />
+                </div>
+              </div>
+              <div className="w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-200 flex items-center justify-center text-indigo-600 shrink-0 group-hover:scale-105 transition-transform">
+                <Zap className="w-6 h-6" />
               </div>
             </div>
           </div>
         </div>
 
-        {/* PROMINENT LIVE TELEMETRY RADAR & CURRENT APPLICATION STREAM */}
-        <div className="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-sm space-y-5">
-          <div className="flex items-center justify-between pb-4 border-b border-slate-100">
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-full text-emerald-800 text-xs font-black tracking-wide">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                LIVE APPLICATION FOCUS RADAR
+        {/* Desktop Agent Quick Access Banner */}
+        <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 rounded-3xl p-5 sm:p-6 text-white shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/15 flex items-center justify-center text-indigo-300 shrink-0">
+              <Laptop className="w-6 h-6" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h4 className="font-extrabold text-white text-sm sm:text-base">
+                  HighP Desktop Agent v1.0.0 for Windows
+                </h4>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
+                  Ready to Deploy
+                </span>
               </div>
-              <span className="text-xs text-slate-500 hidden sm:inline">
-                Currently tracking active software windows across team workstations
+              <p className="text-xs text-slate-300 mt-1 max-w-2xl leading-relaxed">
+                Runs silently in the system tray. Continuously tracks active desktop software windows, browser URLs, and auto-detects idle pauses.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 self-stretch md:self-auto shrink-0">
+            <a
+              href={getDesktopAgentDownloadUrl()}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-md shadow-indigo-600/30 transition-all hover:scale-[1.02] active:scale-[0.98]"
+            >
+              <Download className="w-4 h-4" /> Download Agent (.exe)
+            </a>
+          </div>
+        </div>
+
+        {/* LIVE WORKSTATION RADAR */}
+        <div className="bg-white border border-slate-200/90 rounded-3xl p-6 sm:p-7 shadow-xs space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-5 border-b border-slate-100">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-full text-emerald-800 text-xs font-extrabold tracking-wide">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                LIVE WORKSTATION RADAR
+              </div>
+              <span className="text-xs text-slate-500">
+                Active foreground applications on employee workstations
               </span>
             </div>
-            <span className="text-xs font-bold text-slate-700 bg-slate-100 border border-slate-200 px-2.5 py-1 rounded-lg">
+            <span className="text-xs font-bold text-slate-700 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl self-start sm:self-auto">
               {currentlyActiveWorkers.length} Active Workstations
             </span>
           </div>
 
           {/* Currently Working Spotlight Grid */}
           {currentlyActiveWorkers.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {currentlyActiveWorkers.map((worker) => {
                 const u = worker.userId;
                 const workerName = u ? `${u.firstName} ${u.lastName}` : 'Employee';
@@ -690,35 +756,50 @@ export default function DashboardOverviewPage() {
                 return (
                   <div
                     key={worker._id}
-                    className="p-4 rounded-xl bg-slate-50/70 border border-slate-200 hover:border-slate-300 transition-all flex items-center justify-between group shadow-xs"
+                    className="p-5 rounded-2xl bg-slate-50/70 border border-slate-200 hover:border-indigo-300 hover:bg-white hover:shadow-md transition-all flex flex-col justify-between gap-4 group"
                   >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-10 h-10 rounded-xl bg-black text-white font-bold text-xs ring-2 ring-emerald-400 flex items-center justify-center shrink-0">
-                        {workerName.charAt(0)}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-10 h-10 rounded-xl bg-slate-900 text-white font-extrabold text-xs ring-2 ring-emerald-400 flex items-center justify-center shrink-0">
+                          {workerName.charAt(0)}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-bold text-slate-900 text-xs truncate group-hover:text-indigo-600 transition-colors">
+                            {workerName}
+                          </p>
+                          <p className="text-[11px] text-slate-500 truncate">
+                            {worker.employeeCode} • {worker.department}
+                          </p>
+                        </div>
                       </div>
-                      <div className="min-w-0">
-                        <p className="font-bold text-slate-900 text-xs truncate">
-                          {workerName}
-                        </p>
-                        <p className="text-[11px] text-slate-500 truncate">
-                          {worker.employeeCode} • {worker.department}
-                        </p>
-                      </div>
+
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
+                        Live
+                      </span>
                     </div>
 
-                    <div className="flex flex-col items-end gap-1 shrink-0">
-                      <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-bold ${visuals.color}`}>
-                        <Icon className="w-3.5 h-3.5" />
-                        <span className="truncate max-w-[130px]">{worker.currentApplication}</span>
-                      </div>
-                      <div className="flex items-center gap-1.5 text-[10px]">
-                        <span className="font-semibold text-emerald-700 flex items-center gap-1">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
-                          Live in app
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+                          Active Application
                         </span>
                         {worker.todayActiveSeconds > 0 && (
-                          <span className="text-slate-500 font-mono">
-                            • {formatDuration(worker.todayActiveSeconds)}
+                          <span className="font-mono text-emerald-700 font-bold text-xs">
+                            {formatDuration(worker.todayActiveSeconds)}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold ${visuals.color}`}>
+                          <Icon className="w-4 h-4 shrink-0" />
+                          <span className="truncate max-w-[170px]">{worker.currentApplication}</span>
+                        </div>
+                        {worker.currentWebsite?.domain && (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-mono text-cyan-800 bg-cyan-50 px-2.5 py-1 rounded-xl border border-cyan-200">
+                            <Globe className="w-3.5 h-3.5 text-cyan-700" />
+                            {worker.currentWebsite.domain}
                           </span>
                         )}
                       </div>
@@ -728,13 +809,13 @@ export default function DashboardOverviewPage() {
               })}
             </div>
           ) : (
-            <div className="p-8 rounded-xl bg-slate-50 border border-slate-200/80 text-center space-y-2">
-              <Monitor className="w-8 h-8 text-slate-400 mx-auto" />
-              <p className="text-xs font-semibold text-slate-700">
-                No active workstation application detected right now.
-              </p>
-              <p className="text-[11px] text-slate-500 max-w-md mx-auto">
-                When employees start work on their desktop agent or web portal, their real-time application focus streams directly here.
+            <div className="py-10 px-6 rounded-2xl bg-slate-50 border border-slate-200/80 text-center space-y-2.5">
+              <Monitor className="w-9 h-9 text-slate-300 mx-auto" />
+              <h5 className="text-xs font-bold text-slate-700">
+                No active workstation application detected right now
+              </h5>
+              <p className="text-[11px] text-slate-500 max-w-md mx-auto leading-relaxed">
+                When team members start work on their desktop agent or employee web portal, their active software windows will stream live here.
               </p>
             </div>
           )}
@@ -743,25 +824,25 @@ export default function DashboardOverviewPage() {
           {recentLiveEvents.length > 0 && (
             <div className="pt-4 border-t border-slate-100 space-y-3">
               <div className="flex items-center justify-between text-xs">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-700 flex items-center gap-2">
-                  <Activity className="w-3.5 h-3.5 text-black" />
-                  Recent Activity Stream (Tracked Software & Elapsed Duration)
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-2">
+                  <Activity className="w-3.5 h-3.5 text-indigo-600" />
+                  Recent Application Switches
                 </span>
-                <span className="text-[10px] text-slate-700 font-semibold bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-md">
-                  Active OS Telemetry
+                <span className="text-[10px] text-slate-500 font-semibold bg-slate-50 border border-slate-200 px-2 py-0.5 rounded-lg">
+                  Telemetry Stream
                 </span>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {recentLiveEvents.slice(0, 6).map((ev) => {
                   const visuals = getAppVisuals(ev.app);
                   const Icon = visuals.icon;
                   return (
                     <div
                       key={ev.id}
-                      className={`p-3 rounded-xl border flex items-center justify-between text-xs transition-all ${
+                      className={`p-3.5 rounded-2xl border flex items-center justify-between text-xs transition-all ${
                         ev.isLiveNow
-                          ? 'bg-emerald-50/40 border-emerald-300 shadow-xs'
-                          : 'bg-white border-slate-200 hover:border-slate-300'
+                          ? 'bg-emerald-50/40 border-emerald-300 shadow-2xs'
+                          : 'bg-slate-50/50 border-slate-200 hover:border-slate-300 hover:bg-white'
                       }`}
                     >
                       <div className="flex items-center gap-2.5 min-w-0">
@@ -770,10 +851,9 @@ export default function DashboardOverviewPage() {
                         </div>
                         <div className="min-w-0">
                           <div className="flex items-center gap-1.5">
-                            <strong className="text-slate-900 text-xs truncate max-w-[110px]">{ev.name}</strong>
+                            <strong className="text-slate-900 text-xs truncate max-w-[120px]">{ev.name}</strong>
                             {ev.isLiveNow ? (
-                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300">
-                                <span className="w-1 h-1 rounded-full bg-emerald-500 animate-ping" />
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300">
                                 LIVE
                               </span>
                             ) : null}
@@ -796,209 +876,630 @@ export default function DashboardOverviewPage() {
           )}
         </div>
 
-        {/* Filter and View Control Bar */}
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white border border-slate-200/90 rounded-2xl p-4 shadow-sm">
-          {/* Status Filter Tabs */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 lg:pb-0">
-            {[
-              { label: 'All Team', value: 'ALL', count: overview.totalEmployees },
-              { label: 'Active', value: ActivityState.ACTIVE, count: overview.activeNow },
-              { label: 'Idle', value: ActivityState.IDLE, count: overview.idleNow },
-              { label: 'On Break', value: ActivityState.BREAK, count: overview.onBreakNow },
-              { label: 'Offline', value: ActivityState.OFFLINE, count: overview.offlineNow }
-            ].map((tab) => (
-              <button
-                key={tab.value}
-                onClick={() => setStatusFilter(tab.value)}
-                className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
-                  statusFilter === tab.value
-                    ? 'bg-black text-white shadow-sm'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-                }`}
-              >
-                <span>{tab.label}</span>
-                <span
-                  className={`text-[10px] px-2 py-0.5 rounded-full font-mono ${
-                    statusFilter === tab.value
-                      ? 'bg-white/20 text-white'
-                      : 'bg-slate-100 text-slate-700 border border-slate-200'
-                  }`}
-                >
-                  {tab.count}
-                </span>
-              </button>
-            ))}
-          </div>
+        {/* Granular Section Switcher Tabs */}
+        <div className="bg-slate-200/60 p-1.5 rounded-2xl inline-flex items-center gap-1 w-full sm:w-auto overflow-x-auto">
+          <button
+            onClick={() => setDashboardTab('employees')}
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+              dashboardTab === 'employees'
+                ? 'bg-white text-slate-900 shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+            }`}
+          >
+            <Users className="w-4 h-4 text-indigo-600" />
+            <span>Team Workstation Roster</span>
+            <span className={`text-[11px] px-2 py-0.5 rounded-full font-mono font-bold ${
+              dashboardTab === 'employees' ? 'bg-indigo-50 text-indigo-700' : 'bg-slate-200/80 text-slate-600'
+            }`}>
+              {filteredEmployees.length}
+            </span>
+          </button>
 
-          {/* Search, Dept Filter, View Mode */}
-          <div className="flex items-center gap-3">
-            <div className="relative w-full sm:w-60">
-              <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                type="text"
-                placeholder="Search team member..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-8 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-black focus:border-black font-medium transition-colors"
-              />
-            </div>
+          <button
+            onClick={() => setDashboardTab('apps')}
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+              dashboardTab === 'apps'
+                ? 'bg-white text-slate-900 shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+            }`}
+          >
+            <PieChart className="w-4 h-4 text-indigo-600" />
+            <span>Top Software Analytics</span>
+            <span className={`text-[11px] px-2 py-0.5 rounded-full font-mono font-bold ${
+              dashboardTab === 'apps' ? 'bg-indigo-50 text-indigo-700' : 'bg-slate-200/80 text-slate-600'
+            }`}>
+              {appUsageAnalytics.length}
+            </span>
+          </button>
 
-            <select
-              value={departmentFilter}
-              onChange={(e) => setDepartmentFilter(e.target.value)}
-              className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none focus:ring-1 focus:ring-black focus:border-black"
-            >
-              <option value="ALL">All Departments</option>
-              {departments.map((d) => (
-                <option key={d} value={d}>
-                  {d}
-                </option>
-              ))}
-            </select>
-
-            <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200">
-              <button
-                onClick={() => setViewMode('table')}
-                className={`p-1.5 rounded-lg text-xs transition-colors ${
-                  viewMode === 'table' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-900'
-                }`}
-                title="Table View"
-              >
-                <List className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() => setViewMode('cards')}
-                className={`p-1.5 rounded-lg text-xs transition-colors ${
-                  viewMode === 'cards' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-900'
-                }`}
-                title="Grid Cards View"
-              >
-                <LayoutGrid className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
+          <button
+            onClick={() => setDashboardTab('activity')}
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+              dashboardTab === 'activity'
+                ? 'bg-white text-slate-900 shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+            }`}
+          >
+            <Activity className="w-4 h-4 text-indigo-600" />
+            <span>Live OS Telemetry Logs</span>
+            <span className={`text-[11px] px-2 py-0.5 rounded-full font-mono font-bold ${
+              dashboardTab === 'activity' ? 'bg-indigo-50 text-indigo-700' : 'bg-slate-200/80 text-slate-600'
+            }`}>
+              {activityRecords.length}
+            </span>
+          </button>
         </div>
 
-        {/* View Mode: Table or Grid Cards */}
-        {viewMode === 'table' ? (
-          <div className="bg-white border border-slate-200/90 rounded-2xl shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
+        {dashboardTab === 'employees' && (
+          <div className="space-y-6">
+            {/* Filter and View Control Bar */}
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white border border-slate-200/90 rounded-3xl p-5 shadow-xs">
+              {/* Status Filter Tabs */}
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 lg:pb-0">
+                {[
+                  { label: 'All Team', value: 'ALL', count: overview.totalEmployees },
+                  { label: 'Active', value: ActivityState.ACTIVE, count: overview.activeNow },
+                  { label: 'Idle', value: ActivityState.IDLE, count: overview.idleNow },
+                  { label: 'On Break', value: ActivityState.BREAK, count: overview.onBreakNow },
+                  { label: 'Offline', value: ActivityState.OFFLINE, count: overview.offlineNow }
+                ].map((tab) => (
+                  <button
+                    key={tab.value}
+                    onClick={() => setStatusFilter(tab.value)}
+                    className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+                      statusFilter === tab.value
+                        ? 'bg-slate-900 text-white shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                    }`}
+                  >
+                    <span>{tab.label}</span>
+                    <span
+                      className={`text-[11px] px-2 py-0.5 rounded-full font-mono font-bold ${
+                        statusFilter === tab.value
+                          ? 'bg-white/20 text-white'
+                          : 'bg-slate-100 text-slate-600 border border-slate-200'
+                      }`}
+                    >
+                      {tab.count}
+                    </span>
+                  </button>
+                ))}
+              </div>
+
+              {/* Search, Dept Filter, View Mode */}
+              <div className="flex items-center gap-3">
+                <div className="relative w-full sm:w-60">
+                  <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Search employee..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full pl-9 pr-3.5 py-2 bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 rounded-xl text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 font-medium transition-colors"
+                  />
+                </div>
+
+                <select
+                  value={departmentFilter}
+                  onChange={(e) => setDepartmentFilter(e.target.value)}
+                  className="px-3 py-2 bg-slate-50 hover:bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+                >
+                  <option value="ALL">All Departments</option>
+                  {departments.map((d) => (
+                    <option key={d} value={d}>
+                      {d}
+                    </option>
+                  ))}
+                </select>
+
+                <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200">
+                  <button
+                    onClick={() => setViewMode('table')}
+                    className={`p-1.5 rounded-lg text-xs transition-colors ${
+                      viewMode === 'table' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-900'
+                    }`}
+                    title="Table View"
+                  >
+                    <List className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => setViewMode('cards')}
+                    className={`p-1.5 rounded-lg text-xs transition-colors ${
+                      viewMode === 'cards' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-900'
+                    }`}
+                    title="Grid Cards View"
+                  >
+                    <LayoutGrid className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* View Mode: Table or Grid Cards */}
+            {viewMode === 'table' ? (
+              <div className="bg-white border border-slate-200/90 rounded-3xl shadow-xs overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-50/80 text-slate-500 font-bold uppercase tracking-wider border-b border-slate-200 text-[11px]">
+                      <tr>
+                        <th className="px-6 py-4">Employee</th>
+                        <th className="px-6 py-4">Status</th>
+                        <th className="px-6 py-4">Tracking Source</th>
+                        <th className="px-6 py-4">Current Focus Application</th>
+                        <th className="px-6 py-4">Active Work</th>
+                        <th className="px-6 py-4">Idle Time</th>
+                        <th className="px-6 py-4">Break Time</th>
+                        <th className="px-6 py-4">Last Activity</th>
+                        <th className="px-6 py-4 text-right">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+                      {filteredEmployees.length === 0 ? (
+                        <tr>
+                          <td colSpan={9} className="px-6 py-14 text-center text-slate-400">
+                            <Users className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                            No team members match the selected criteria.
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredEmployees.map((emp) => {
+                          const user = emp.userId;
+                          const name = user ? `${user.firstName} ${user.lastName}` : 'Employee';
+                          const lastActive = emp.lastActiveAt
+                            ? new Date(emp.lastActiveAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                            : '—';
+
+                          const statusRing =
+                            emp.currentStatus === ActivityState.ACTIVE
+                              ? 'ring-2 ring-emerald-500/80 shadow-xs'
+                              : emp.currentStatus === ActivityState.IDLE
+                              ? 'ring-2 ring-amber-500/80'
+                              : emp.currentStatus === ActivityState.BREAK
+                              ? 'ring-2 ring-sky-500/80'
+                              : 'ring-1 ring-slate-200';
+
+                          const visuals = getAppVisuals(emp.currentApplication);
+                          const Icon = visuals.icon;
+
+                          return (
+                            <tr key={emp._id} className="hover:bg-slate-50/80 transition-colors group">
+                              <td className="px-6 py-4.5">
+                                <div className="flex items-center gap-3">
+                                  <div
+                                    className={`w-9 h-9 rounded-xl bg-slate-900 text-white font-extrabold flex items-center justify-center text-xs shrink-0 ${statusRing}`}
+                                  >
+                                    {name.charAt(0)}
+                                  </div>
+                                  <div>
+                                    <p className="font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">
+                                      {name}
+                                    </p>
+                                    <p className="text-[11px] text-slate-500">
+                                      {emp.employeeCode} • {emp.department}
+                                    </p>
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="px-6 py-4.5">
+                                <StatusBadge status={emp.currentStatus} />
+                              </td>
+                              <td className="px-6 py-4.5">
+                                {emp.currentStatus === ActivityState.OFFLINE ? (
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-slate-100 text-slate-500 border border-slate-200">
+                                    Offline
+                                  </span>
+                                ) : emp.currentDeviceId ? (
+                                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-slate-100 text-slate-800 border border-slate-200">
+                                    <Laptop className="w-3.5 h-3.5 text-slate-600" /> Desktop Agent
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                                    <Radio className="w-3.5 h-3.5 text-amber-700" /> Web Workspace
+                                  </span>
+                                )}
+                              </td>
+                              <td className="px-6 py-4.5">
+                                {emp.currentStatus === ActivityState.OFFLINE ? (
+                                  <span className="text-slate-400 font-normal">None (Offline)</span>
+                                ) : emp.currentApplication ? (
+                                  <div className="flex flex-col gap-1 items-start">
+                                    <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-semibold ${visuals.color}`}>
+                                      <Icon className="w-3.5 h-3.5 shrink-0" />
+                                      <span className="truncate max-w-[170px]">{emp.currentApplication}</span>
+                                    </div>
+                                    {emp.currentWebsite?.domain && (
+                                      <span className="inline-flex items-center gap-1 text-[11px] font-mono text-cyan-800 bg-cyan-50 px-2 py-0.5 rounded border border-cyan-200">
+                                        <Globe className="w-3 h-3 text-cyan-700" />
+                                        {emp.currentWebsite.domain}
+                                      </span>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <span className="text-slate-400">No active window</span>
+                                )}
+                              </td>
+                              <td className="px-6 py-4.5 font-bold text-emerald-700 font-mono">
+                                {formatDuration(emp.todayActiveSeconds)}
+                              </td>
+                              <td className="px-6 py-4.5 text-amber-700 font-semibold font-mono">
+                                {formatDuration(emp.todayIdleSeconds)}
+                              </td>
+                              <td className="px-6 py-4.5 text-sky-700 font-semibold font-mono">
+                                {formatDuration(emp.todayBreakSeconds)}
+                              </td>
+                              <td className="px-6 py-4.5 text-slate-500 font-mono text-xs">{lastActive}</td>
+                              <td className="px-6 py-4.5 text-right">
+                                <Link
+                                  to={`/dashboard/employees/${emp._id}`}
+                                  className="inline-flex items-center gap-1.5 text-xs font-bold text-indigo-600 hover:text-indigo-700 bg-indigo-50/80 hover:bg-indigo-100/80 border border-indigo-200/80 px-3 py-1.5 rounded-xl transition-all shadow-2xs"
+                                >
+                                  View <ArrowUpRight className="w-3.5 h-3.5" />
+                                </Link>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : (
+              /* Grid Cards View */
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                {filteredEmployees.map((emp) => {
+                  const user = emp.userId;
+                  const name = user ? `${user.firstName} ${user.lastName}` : 'Employee';
+                  const totalToday = (emp.todayActiveSeconds || 0) + (emp.todayIdleSeconds || 0);
+                  const activePct = totalToday > 0 ? Math.round((emp.todayActiveSeconds / totalToday) * 100) : 0;
+                  const visuals = getAppVisuals(emp.currentApplication);
+                  const Icon = visuals.icon;
+
+                  return (
+                    <div
+                      key={emp._id}
+                      className="bg-white border border-slate-200/90 rounded-3xl p-6 shadow-xs hover:border-indigo-300 hover:shadow-md transition-all flex flex-col justify-between gap-5 group"
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center gap-3.5">
+                          <div className="w-12 h-12 rounded-2xl bg-slate-900 text-white font-extrabold flex items-center justify-center text-sm shadow-xs ring-2 ring-indigo-50">
+                            {name.charAt(0)}
+                          </div>
+                          <div>
+                            <h4 className="font-extrabold text-slate-900 group-hover:text-indigo-600 transition-colors text-sm">
+                              {name}
+                            </h4>
+                            <p className="text-xs text-slate-500 font-medium">
+                              {emp.employeeCode} • {emp.department}
+                            </p>
+                          </div>
+                        </div>
+                        <StatusBadge status={emp.currentStatus} />
+                      </div>
+
+                      {/* Current Active App Spotlight */}
+                      <div className="p-3.5 bg-slate-50/80 rounded-2xl border border-slate-200/80 flex items-center justify-between">
+                        <span className="text-xs font-semibold text-slate-400">Current Focus</span>
+                        {emp.currentStatus === ActivityState.OFFLINE ? (
+                          <span className="text-xs font-semibold text-slate-400">None (Offline)</span>
+                        ) : emp.currentApplication ? (
+                          <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                            <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-bold ${visuals.color}`}>
+                              <Icon className="w-3.5 h-3.5" />
+                              <span className="truncate max-w-[120px]">{emp.currentApplication}</span>
+                            </div>
+                            {emp.currentWebsite?.domain && (
+                              <span className="inline-flex items-center gap-1 text-[11px] font-mono text-cyan-800 bg-cyan-50 px-2 py-0.5 rounded border border-cyan-200">
+                                <Globe className="w-3 h-3 text-cyan-700" />
+                                {emp.currentWebsite.domain}
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-slate-400">No active window</span>
+                        )}
+                      </div>
+
+                      {/* Productivity Ratio Bar */}
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-xs font-semibold">
+                          <span className="text-slate-500">
+                            Active Work: <strong className="text-emerald-700 font-mono">{formatDuration(emp.todayActiveSeconds)}</strong>
+                          </span>
+                          <span className="text-emerald-700 font-bold">{activePct}%</span>
+                        </div>
+                        <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden border border-slate-200">
+                          <div
+                            className="h-full bg-indigo-600 rounded-full transition-all"
+                            style={{ width: `${activePct}%` }}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+                        <span className="text-[11px] text-slate-500 font-medium">
+                          Idle: {formatDuration(emp.todayIdleSeconds)} • Break: {formatDuration(emp.todayBreakSeconds)}
+                        </span>
+                        <Link
+                          to={`/dashboard/employees/${emp._id}`}
+                          className="inline-flex items-center gap-1 text-xs font-bold text-indigo-600 hover:text-indigo-700"
+                        >
+                          View Day <ArrowUpRight className="w-3.5 h-3.5" />
+                        </Link>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* SECTION 21: APPLICATION USAGE ANALYTICS */}
+        {dashboardTab === 'apps' && (
+          <div className="bg-white border border-slate-200/90 rounded-3xl p-6 sm:p-7 shadow-xs space-y-6 animate-in fade-in duration-200">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-slate-100">
+              <div>
+                <div className="flex items-center gap-2.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-indigo-600" />
+                  <h3 className="text-base sm:text-lg font-extrabold text-slate-900 tracking-tight">Software Usage Analytics</h3>
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                    Aggregated
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500 mt-1">
+                  Authoritative time spent across detected workstation applications for {activityDateFilter}
+                </p>
+              </div>
+              <div className="text-xs font-semibold px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 self-start sm:self-auto">
+                Total Monitored Time:{' '}
+                <strong className="text-emerald-700 ml-1 font-mono text-sm">{formatDuration(totalAppUsageSeconds)}</strong>
+              </div>
+            </div>
+
+            {appUsageAnalytics.length === 0 ? (
+              <div className="p-12 rounded-2xl bg-slate-50 border border-slate-200 text-center text-slate-500 text-xs space-y-2">
+                <Monitor className="w-9 h-9 text-slate-400 mx-auto opacity-50" />
+                <p className="font-semibold text-slate-700">No application usage recorded for this date.</p>
+                <p className="text-[11px] text-slate-400">Activity accumulates as team members work in desktop applications.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+                {appUsageAnalytics.map((app, idx) => {
+                  const visuals = getAppVisuals(app.applicationName);
+                  const Icon = visuals.icon;
+                  const pct = totalAppUsageSeconds > 0 ? Math.round((app.totalSeconds / totalAppUsageSeconds) * 100) : 0;
+
+                  return (
+                    <div
+                      key={idx}
+                      className="p-5 rounded-2xl bg-slate-50/80 border border-slate-200 hover:border-indigo-300 hover:bg-white hover:shadow-md transition-all flex flex-col justify-between gap-4 group"
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className={`p-2.5 rounded-xl border shrink-0 ${visuals.color}`}>
+                            <Icon className="w-5 h-5" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="font-bold text-slate-900 text-xs truncate group-hover:text-indigo-600 transition-colors">
+                              {app.applicationName}
+                            </p>
+                            <span className="text-[11px] text-slate-500 font-medium">{app.category || 'Other'}</span>
+                          </div>
+                        </div>
+                        <span className="text-xs font-extrabold text-slate-800 font-mono">{pct}%</span>
+                      </div>
+
+                      <div>
+                        <div className="flex justify-between items-baseline text-xs mb-2">
+                          <span className="text-[11px] text-slate-400 uppercase tracking-wider font-semibold">Total Usage</span>
+                          <strong className="text-slate-900 font-mono text-sm font-extrabold">
+                            {formatDuration(app.totalSeconds)}
+                          </strong>
+                        </div>
+                        <div className="w-full h-2 bg-slate-200/80 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-indigo-600 rounded-full transition-all"
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* SECTION 20: PERSISTED APPLICATION ACTIVITY RECORDS TABLE */}
+        {dashboardTab === 'activity' && (
+          <div className="bg-white border border-slate-200/90 rounded-3xl shadow-xs overflow-hidden space-y-5 p-6 sm:p-7 animate-in fade-in duration-200">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-5 border-b border-slate-100">
+              <div>
+                <div className="flex items-center gap-2.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-600" />
+                  <h3 className="text-base sm:text-lg font-extrabold text-slate-900 tracking-tight">OS Telemetry Event Records</h3>
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                    MongoDB Audit Log
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500 mt-1">
+                  Chronological workstation window switches, process events, and idle intervals
+                </p>
+              </div>
+              {isActivityLoading && (
+                <span className="text-xs text-indigo-600 font-bold animate-pulse flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-indigo-600" />
+                  Synchronizing records...
+                </span>
+              )}
+            </div>
+
+            {/* Filters */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="Filter by app name..."
+                  value={activityAppFilter}
+                  onChange={(e) => setActivityAppFilter(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 rounded-xl text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 font-medium"
+                />
+              </div>
+
+              <div>
+                <select
+                  value={activityCategoryFilter}
+                  onChange={(e) => setActivityCategoryFilter(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-slate-50 hover:bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+                >
+                  <option value="ALL">All Categories</option>
+                  <option value="Development">Development</option>
+                  <option value="Design">Design</option>
+                  <option value="Communication">Communication</option>
+                  <option value="Browsers">Browsers</option>
+                  <option value="Productivity">Productivity</option>
+                  <option value="Marketing">Marketing</option>
+                  <option value="Project Management">Project Management</option>
+                  <option value="File Management">File Management</option>
+                  <option value="Media">Media</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+
+              <div>
+                <select
+                  value={activityEmployeeFilter}
+                  onChange={(e) => setActivityEmployeeFilter(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-slate-50 hover:bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+                >
+                  <option value="ALL">All Employees</option>
+                  {employees.map((emp) => {
+                    const empName = emp.userId ? `${emp.userId.firstName} ${emp.userId.lastName}` : emp.employeeCode;
+                    return (
+                      <option key={emp._id} value={emp._id}>
+                        {empName} ({emp.employeeCode})
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+
+              <div>
+                <input
+                  type="date"
+                  value={activityDateFilter}
+                  onChange={(e) => setActivityDateFilter(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-slate-50 hover:bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+                />
+              </div>
+
+              <div>
+                <select
+                  value={activityStatusFilter}
+                  onChange={(e) => setActivityStatusFilter(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-slate-50 hover:bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+                >
+                  <option value="ALL">All Statuses</option>
+                  <option value="ACTIVE">Active</option>
+                  <option value="IDLE">Idle</option>
+                  <option value="COMPLETED">Completed</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Activity Records Table */}
+            <div className="overflow-x-auto rounded-2xl border border-slate-200">
               <table className="w-full text-left text-xs">
                 <thead className="bg-slate-50 text-slate-500 font-bold uppercase tracking-wider border-b border-slate-200 text-[11px]">
                   <tr>
-                    <th className="px-6 py-4">Employee</th>
-                    <th className="px-6 py-4">Live Status</th>
-                    <th className="px-6 py-4">Tracking Source</th>
-                    <th className="px-6 py-4">Active Application</th>
-                    <th className="px-6 py-4">Active Today</th>
-                    <th className="px-6 py-4">Idle Time</th>
-                    <th className="px-6 py-4">Break Time</th>
-                    <th className="px-6 py-4">Last Activity</th>
-                    <th className="px-6 py-4 text-right">Analytics</th>
+                    <th className="px-5 py-3.5">Application</th>
+                    <th className="px-5 py-3.5">Category</th>
+                    <th className="px-5 py-3.5">Employee</th>
+                    <th className="px-5 py-3.5">Started</th>
+                    <th className="px-5 py-3.5">Last Seen</th>
+                    <th className="px-5 py-3.5">Duration</th>
+                    <th className="px-5 py-3.5">Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
-                  {filteredEmployees.length === 0 ? (
+                  {activityRecords.length === 0 ? (
                     <tr>
-                      <td colSpan={9} className="px-6 py-14 text-center text-slate-400">
-                        <Users className="w-8 h-8 text-slate-400 mx-auto mb-2 opacity-50" />
-                        No team members match the selected criteria.
+                      <td colSpan={7} className="px-6 py-12 text-center text-slate-400">
+                        <Clock className="w-7 h-7 text-slate-300 mx-auto mb-2" />
+                        No activity session records match your filter criteria.
                       </td>
                     </tr>
                   ) : (
-                    filteredEmployees.map((emp) => {
-                      const user = emp.userId;
-                      const name = user ? `${user.firstName} ${user.lastName}` : 'Employee';
-                      const lastActive = emp.lastActiveAt
-                        ? new Date(emp.lastActiveAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                        : 'N/A';
-
-                      const statusRing =
-                        emp.currentStatus === ActivityState.ACTIVE
-                          ? 'ring-2 ring-emerald-500/80 shadow-xs'
-                          : emp.currentStatus === ActivityState.IDLE
-                          ? 'ring-2 ring-amber-500/80'
-                          : emp.currentStatus === ActivityState.BREAK
-                          ? 'ring-2 ring-sky-500/80'
-                          : 'ring-1 ring-slate-300';
-
-                      const visuals = getAppVisuals(emp.currentApplication);
+                    activityRecords.map((rec, i) => {
+                      const visuals = getAppVisuals(rec.applicationName);
                       const Icon = visuals.icon;
+                      const u = rec.employeeId?.userId;
+                      const empName = u ? `${u.firstName || ''} ${u.lastName || ''}`.trim() || 'Employee' : 'Employee';
+                      const startedFormatted = rec.startedAt
+                        ? new Date(rec.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                        : '—';
+                      const lastSeenFormatted = rec.lastSeenAt || rec.endedAt
+                        ? new Date(rec.lastSeenAt || rec.endedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                        : '—';
+                      const isLive = rec.isLiveNow || rec.status === 'ACTIVE';
 
                       return (
-                        <tr key={emp._id} className="hover:bg-slate-50/70 transition-colors group">
-                          <td className="px-6 py-4">
-                            <div className="flex items-center gap-3">
-                              <div
-                                className={`w-9 h-9 rounded-xl bg-black text-white font-bold flex items-center justify-center text-xs ${statusRing}`}
-                              >
-                                {name.charAt(0)}
+                        <tr key={rec._id || rec.eventId || i} className="hover:bg-slate-50/80 transition-colors group">
+                          <td className="px-5 py-3.5">
+                            <div className="flex items-center gap-2.5">
+                              <div className={`p-1.5 rounded-lg border shrink-0 ${visuals.color}`}>
+                                <Icon className="w-3.5 h-3.5" />
                               </div>
-                              <div>
-                                <p className="font-bold text-slate-900 group-hover:text-black transition-colors">
-                                  {name}
-                                </p>
-                                <p className="text-[11px] text-slate-500">
-                                  {emp.employeeCode} • {emp.department}
-                                </p>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4">
-                            <StatusBadge status={emp.currentStatus} />
-                          </td>
-                          <td className="px-6 py-4">
-                            {emp.currentStatus === ActivityState.OFFLINE ? (
-                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
-                                OFFLINE
-                              </span>
-                            ) : emp.currentDeviceId ? (
-                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-slate-100 text-slate-800 border border-slate-200">
-                                <Laptop className="w-3.5 h-3.5 text-slate-700" /> DESKTOP AGENT
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
-                                <Radio className="w-3.5 h-3.5 text-amber-700" /> WEB WORKSPACE
-                              </span>
-                            )}
-                          </td>
-                          <td className="px-6 py-4">
-                            {emp.currentStatus === ActivityState.OFFLINE ? (
-                              <span className="text-slate-400 font-normal">None (Offline)</span>
-                            ) : emp.currentApplication ? (
-                              <div className="flex flex-col gap-1 items-start">
-                                <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-semibold ${visuals.color}`}>
-                                  <Icon className="w-3.5 h-3.5 shrink-0" />
-                                  <span className="truncate max-w-[170px]">{emp.currentApplication}</span>
-                                </div>
-                                {emp.currentWebsite?.domain && (
-                                  <span className="inline-flex items-center gap-1 text-[11px] font-mono text-cyan-800 bg-cyan-50 px-2 py-0.5 rounded border border-cyan-200">
-                                    <Globe className="w-3 h-3 text-cyan-700" />
-                                    {emp.currentWebsite.domain}
+                              <div className="min-w-0">
+                                <span className="font-bold text-slate-900 group-hover:text-indigo-600 transition-colors block truncate max-w-[180px]">
+                                  {rec.applicationName}
+                                </span>
+                                {rec.processName && (
+                                  <span className="text-[10px] text-slate-500 font-mono block">
+                                    {rec.processName}
                                   </span>
                                 )}
                               </div>
+                            </div>
+                          </td>
+
+                          <td className="px-5 py-3.5">
+                            <span className="px-2.5 py-1 bg-slate-100 rounded-full text-[11px] font-semibold text-slate-700 border border-slate-200">
+                              {rec.category || 'Other'}
+                            </span>
+                          </td>
+
+                          <td className="px-5 py-3.5">
+                            <div>
+                              <span className="font-semibold text-slate-900 block">{empName}</span>
+                              <span className="text-[10px] text-slate-500">{rec.employeeId?.employeeCode || ''}</span>
+                            </div>
+                          </td>
+
+                          <td className="px-5 py-3.5 font-mono text-slate-600">{startedFormatted}</td>
+                          <td className="px-5 py-3.5 font-mono text-slate-500">{lastSeenFormatted}</td>
+
+                          <td className="px-5 py-3.5 font-mono font-bold text-emerald-700">
+                            {formatDuration(rec.durationSeconds || rec.todayTotalSeconds || 0)}
+                          </td>
+
+                          <td className="px-5 py-3.5">
+                            {isLive ? (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
+                                Active
+                              </span>
+                            ) : rec.type === 'IDLE_INTERVAL' || rec.status === 'IDLE' ? (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                                Idle
+                              </span>
                             ) : (
-                              <span className="text-slate-400">No active application</span>
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                                Completed
+                              </span>
                             )}
-                          </td>
-                          <td className="px-6 py-4 font-bold text-emerald-700 font-mono">
-                            {formatDuration(emp.todayActiveSeconds)}
-                          </td>
-                          <td className="px-6 py-4 text-amber-700 font-semibold font-mono">
-                            {formatDuration(emp.todayIdleSeconds)}
-                          </td>
-                          <td className="px-6 py-4 text-sky-700 font-semibold font-mono">
-                            {formatDuration(emp.todayBreakSeconds)}
-                          </td>
-                          <td className="px-6 py-4 text-slate-500">{lastActive}</td>
-                          <td className="px-6 py-4 text-right">
-                            <Link
-                              to={`/dashboard/employees/${emp._id}`}
-                              className="inline-flex items-center gap-1 text-xs font-bold text-slate-900 hover:text-black bg-slate-100 hover:bg-slate-200 border border-slate-200 px-3 py-1.5 rounded-lg transition-all"
-                            >
-                              Timeline <ArrowUpRight className="w-3.5 h-3.5" />
-                            </Link>
                           </td>
                         </tr>
                       );
@@ -1008,379 +1509,7 @@ export default function DashboardOverviewPage() {
               </table>
             </div>
           </div>
-        ) : (
-          /* Grid Cards View */
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {filteredEmployees.map((emp) => {
-              const user = emp.userId;
-              const name = user ? `${user.firstName} ${user.lastName}` : 'Employee';
-              const totalToday = (emp.todayActiveSeconds || 0) + (emp.todayIdleSeconds || 0);
-              const activePct = totalToday > 0 ? Math.round((emp.todayActiveSeconds / totalToday) * 100) : 0;
-              const visuals = getAppVisuals(emp.currentApplication);
-              const Icon = visuals.icon;
-
-              return (
-                <div
-                  key={emp._id}
-                  className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-sm hover:border-slate-300 transition-all flex flex-col justify-between gap-4 group"
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-11 h-11 rounded-xl bg-black text-white font-bold flex items-center justify-center text-sm">
-                        {name.charAt(0)}
-                      </div>
-                      <div>
-                        <h4 className="font-bold text-slate-900 group-hover:text-black transition-colors">
-                          {name}
-                        </h4>
-                        <p className="text-[11px] text-slate-500">
-                          {emp.employeeCode} • {emp.department}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex flex-col items-end gap-1.5">
-                      <StatusBadge status={emp.currentStatus} />
-                    </div>
-                  </div>
-
-                  {/* Current Active App Spotlight */}
-                  <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between">
-                    <span className="text-[11px] font-semibold text-slate-500">Current Focus</span>
-                    {emp.currentStatus === ActivityState.OFFLINE ? (
-                      <span className="text-xs font-semibold text-slate-400">None (Offline)</span>
-                    ) : emp.currentApplication ? (
-                      <div className="flex items-center gap-1.5 flex-wrap justify-end">
-                        <div className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg border text-xs font-bold ${visuals.color}`}>
-                          <Icon className="w-3 h-3" />
-                          <span className="truncate max-w-[110px]">{emp.currentApplication}</span>
-                        </div>
-                        {emp.currentWebsite?.domain && (
-                          <span className="inline-flex items-center gap-1 text-[11px] font-mono text-cyan-800 bg-cyan-50 px-1.5 py-0.5 rounded border border-cyan-200">
-                            <Globe className="w-2.5 h-2.5 text-cyan-700" />
-                            {emp.currentWebsite.domain}
-                          </span>
-                        )}
-                      </div>
-                    ) : (
-                      <span className="text-xs text-slate-400">No active application</span>
-                    )}
-                  </div>
-
-                  {/* Productivity Ratio Bar */}
-                  <div className="space-y-1.5">
-                    <div className="flex justify-between text-xs font-semibold">
-                      <span className="text-slate-500">
-                        Active Work: <strong className="text-emerald-700 font-mono">{formatDuration(emp.todayActiveSeconds)}</strong>
-                      </span>
-                      <span className="text-emerald-700">{activePct}%</span>
-                    </div>
-                    <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden border border-slate-200">
-                      <div
-                        className="h-full bg-black rounded-full transition-all"
-                        style={{ width: `${activePct}%` }}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
-                    <span className="text-[11px] text-slate-500">
-                      Idle: {formatDuration(emp.todayIdleSeconds)} • Break: {formatDuration(emp.todayBreakSeconds)}
-                    </span>
-                    <Link
-                      to={`/dashboard/employees/${emp._id}`}
-                      className="inline-flex items-center gap-1 text-xs font-bold text-slate-900 hover:text-black"
-                    >
-                      View Day <ArrowUpRight className="w-3.5 h-3.5" />
-                    </Link>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
         )}
-
-        {/* SECTION 21: APPLICATION USAGE ANALYTICS */}
-        <div className="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-sm space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-black" />
-                <h3 className="text-base font-bold text-slate-900 tracking-tight">Application Usage Analytics</h3>
-                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
-                  Persisted
-                </span>
-              </div>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Aggregate time spent across all registered workstation applications for {activityDateFilter}
-              </p>
-            </div>
-            <div className="text-xs font-semibold px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 self-start sm:self-auto">
-              Total Recorded Time:{' '}
-              <strong className="text-emerald-700 ml-1 font-mono">{formatDuration(totalAppUsageSeconds)}</strong>
-            </div>
-          </div>
-
-          {appUsageAnalytics.length === 0 ? (
-            <div className="p-8 rounded-xl bg-slate-50 border border-slate-200 text-center text-slate-500 text-xs">
-              <Monitor className="w-8 h-8 text-slate-400 mx-auto mb-2 opacity-50" />
-              No persisted application usage records found for this date.
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3.5">
-              {appUsageAnalytics.slice(0, 10).map((app, idx) => {
-                const visuals = getAppVisuals(app.applicationName);
-                const Icon = visuals.icon;
-                const pct = totalAppUsageSeconds > 0 ? Math.round((app.totalSeconds / totalAppUsageSeconds) * 100) : 0;
-
-                return (
-                  <div
-                    key={idx}
-                    className="p-4 rounded-xl bg-slate-50/70 border border-slate-200 hover:border-slate-300 transition-all flex flex-col justify-between gap-3 group shadow-xs"
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <div className={`p-2 rounded-lg border shrink-0 ${visuals.color}`}>
-                          <Icon className="w-4 h-4" />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="font-bold text-slate-900 text-xs truncate">
-                            {app.applicationName}
-                          </p>
-                          <span className="text-[10px] text-slate-500">{app.category || 'Other'}</span>
-                        </div>
-                      </div>
-                      <span className="text-[11px] font-bold text-slate-800 font-mono">{pct}%</span>
-                    </div>
-
-                    <div>
-                      <div className="flex justify-between items-baseline text-xs mb-1.5">
-                        <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Duration</span>
-                        <strong className="text-slate-900 font-mono text-sm font-bold">
-                          {formatDuration(app.totalSeconds)}
-                        </strong>
-                      </div>
-                      <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-black rounded-full"
-                          style={{ width: `${pct}%` }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* SECTION 20: PERSISTED APPLICATION ACTIVITY RECORDS TABLE */}
-        <div className="bg-white border border-slate-200/90 rounded-2xl shadow-sm overflow-hidden space-y-4 p-6">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-slate-100">
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-600" />
-                <h3 className="text-base font-bold text-slate-900 tracking-tight">Application Activity Records</h3>
-                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
-                  MongoDB Source of Truth
-                </span>
-              </div>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Authoritative chronological application session logs with duration and status
-              </p>
-            </div>
-            {isActivityLoading && (
-              <span className="text-xs text-slate-600 font-semibold animate-pulse">
-                Synchronizing activity...
-              </span>
-            )}
-          </div>
-
-          {/* Section 20 Filters: Application, Category, Employee, Date, Status */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-            {/* Filter 1: Application */}
-            <div className="relative">
-              <input
-                type="text"
-                placeholder="Filter by app (e.g. Code, Chrome)..."
-                value={activityAppFilter}
-                onChange={(e) => setActivityAppFilter(e.target.value)}
-                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-black focus:border-black font-medium"
-              />
-            </div>
-
-            {/* Filter 2: Category */}
-            <div>
-              <select
-                value={activityCategoryFilter}
-                onChange={(e) => setActivityCategoryFilter(e.target.value)}
-                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none focus:ring-1 focus:ring-black focus:border-black"
-              >
-                <option value="ALL">All Categories</option>
-                <option value="Development">Development</option>
-                <option value="Design">Design</option>
-                <option value="Communication">Communication</option>
-                <option value="Browsers">Browsers</option>
-                <option value="Productivity">Productivity</option>
-                <option value="Marketing">Marketing</option>
-                <option value="Project Management">Project Management</option>
-                <option value="File Management">File Management</option>
-                <option value="Media">Media</option>
-                <option value="Other">Other</option>
-              </select>
-            </div>
-
-            {/* Filter 3: Employee */}
-            <div>
-              <select
-                value={activityEmployeeFilter}
-                onChange={(e) => setActivityEmployeeFilter(e.target.value)}
-                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none focus:ring-1 focus:ring-black focus:border-black"
-              >
-                <option value="ALL">All Employees</option>
-                {employees.map((emp) => {
-                  const empName = emp.userId ? `${emp.userId.firstName} ${emp.userId.lastName}` : emp.employeeCode;
-                  return (
-                    <option key={emp._id} value={emp._id}>
-                      {empName} ({emp.employeeCode})
-                    </option>
-                  );
-                })}
-              </select>
-            </div>
-
-            {/* Filter 4: Date */}
-            <div className="relative flex items-center">
-              <input
-                type="date"
-                value={activityDateFilter}
-                onChange={(e) => setActivityDateFilter(e.target.value)}
-                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none focus:ring-1 focus:ring-black focus:border-black"
-              />
-            </div>
-
-            {/* Filter 5: Status */}
-            <div>
-              <select
-                value={activityStatusFilter}
-                onChange={(e) => setActivityStatusFilter(e.target.value)}
-                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none focus:ring-1 focus:ring-black focus:border-black"
-              >
-                <option value="ALL">All Statuses</option>
-                <option value="ACTIVE">Active</option>
-                <option value="IDLE">Idle</option>
-                <option value="COMPLETED">Completed</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Activity Records Table */}
-          <div className="overflow-x-auto rounded-xl border border-slate-200">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50 text-slate-500 font-bold uppercase tracking-wider border-b border-slate-200 text-[11px]">
-                <tr>
-                  <th className="px-5 py-3.5">Application</th>
-                  <th className="px-5 py-3.5">Category</th>
-                  <th className="px-5 py-3.5">Employee</th>
-                  <th className="px-5 py-3.5">Started</th>
-                  <th className="px-5 py-3.5">Last Seen</th>
-                  <th className="px-5 py-3.5">Duration</th>
-                  <th className="px-5 py-3.5">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
-                {activityRecords.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="px-6 py-12 text-center text-slate-400">
-                      <Clock className="w-7 h-7 text-slate-400 mx-auto mb-2 opacity-50" />
-                      No activity session records match your filter criteria.
-                    </td>
-                  </tr>
-                ) : (
-                  activityRecords.map((rec, i) => {
-                    const visuals = getAppVisuals(rec.applicationName);
-                    const Icon = visuals.icon;
-                    const u = rec.employeeId?.userId;
-                    const empName = u ? `${u.firstName || ''} ${u.lastName || ''}`.trim() || 'Employee' : 'Employee';
-                    const startedFormatted = rec.startedAt
-                      ? new Date(rec.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                      : '—';
-                    const lastSeenFormatted = rec.lastSeenAt || rec.endedAt
-                      ? new Date(rec.lastSeenAt || rec.endedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                      : '—';
-                    const isLive = rec.isLiveNow || rec.status === 'ACTIVE';
-
-                    return (
-                      <tr key={rec._id || rec.eventId || i} className="hover:bg-slate-50 transition-colors group">
-                        {/* Application */}
-                        <td className="px-5 py-3.5">
-                          <div className="flex items-center gap-2.5">
-                            <div className={`p-1.5 rounded-lg border shrink-0 ${visuals.color}`}>
-                              <Icon className="w-3.5 h-3.5" />
-                            </div>
-                            <div className="min-w-0">
-                              <span className="font-bold text-slate-900 group-hover:text-black transition-colors block truncate max-w-[180px]">
-                                {rec.applicationName}
-                              </span>
-                              {rec.processName && (
-                                <span className="text-[10px] text-slate-500 font-mono block">
-                                  {rec.processName}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </td>
-
-                        {/* Category */}
-                        <td className="px-5 py-3.5">
-                          <span className="px-2.5 py-1 bg-slate-100 rounded-full text-[11px] font-semibold text-slate-700 border border-slate-200">
-                            {rec.category || 'Other'}
-                          </span>
-                        </td>
-
-                        {/* Employee */}
-                        <td className="px-5 py-3.5">
-                          <div>
-                            <span className="font-semibold text-slate-900 block">{empName}</span>
-                            <span className="text-[10px] text-slate-500">{rec.employeeId?.employeeCode || ''}</span>
-                          </div>
-                        </td>
-
-                        {/* Started */}
-                        <td className="px-5 py-3.5 font-mono text-slate-600">{startedFormatted}</td>
-
-                        {/* Last Seen */}
-                        <td className="px-5 py-3.5 font-mono text-slate-500">{lastSeenFormatted}</td>
-
-                        {/* Duration */}
-                        <td className="px-5 py-3.5 font-mono font-bold text-emerald-700">
-                          {formatDuration(rec.durationSeconds || rec.todayTotalSeconds || 0)}
-                        </td>
-
-                        {/* Status */}
-                        <td className="px-5 py-3.5">
-                          {isLive ? (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
-                              Active
-                            </span>
-                          ) : rec.type === 'IDLE_INTERVAL' || rec.status === 'IDLE' ? (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
-                              Idle
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
-                              Completed
-                            </span>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
       </main>
 
       {/* Add Employee Modal */}
@@ -1412,7 +1541,7 @@ export default function DashboardOverviewPage() {
                     required
                     value={newFirstName}
                     onChange={(e) => setNewFirstName(e.target.value)}
-                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-1 focus:ring-black focus:border-black font-medium"
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-1 focus:ring-indigo-600 focus:border-indigo-600 font-medium"
                     placeholder="Arun"
                   />
                 </div>
@@ -1423,7 +1552,7 @@ export default function DashboardOverviewPage() {
                     required
                     value={newLastName}
                     onChange={(e) => setNewLastName(e.target.value)}
-                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-1 focus:ring-black focus:border-black font-medium"
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-1 focus:ring-indigo-600 focus:border-indigo-600 font-medium"
                     placeholder="Kumar"
                   />
                 </div>
@@ -1436,7 +1565,7 @@ export default function DashboardOverviewPage() {
                   required
                   value={newEmail}
                   onChange={(e) => setNewEmail(e.target.value)}
-                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-1 focus:ring-black focus:border-black font-medium"
+                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-1 focus:ring-indigo-600 focus:border-indigo-600 font-medium"
                   placeholder="arun@company.com"
                 />
               </div>
@@ -1449,7 +1578,7 @@ export default function DashboardOverviewPage() {
                     required
                     value={newCode}
                     onChange={(e) => setNewCode(e.target.value)}
-                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-1 focus:ring-black focus:border-black font-medium uppercase"
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-1 focus:ring-indigo-600 focus:border-indigo-600 font-medium uppercase"
                     placeholder="HP-005"
                   />
                 </div>
@@ -1458,7 +1587,7 @@ export default function DashboardOverviewPage() {
                   <select
                     value={newRole}
                     onChange={(e) => setNewRole(e.target.value as UserRole)}
-                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-1 focus:ring-black focus:border-black font-semibold"
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-1 focus:ring-indigo-600 focus:border-indigo-600 font-semibold"
                   >
                     <option value={UserRole.EMPLOYEE}>Employee (Workforce)</option>
                     <option value={UserRole.MANAGER}>Manager / Team Lead</option>
@@ -1475,7 +1604,7 @@ export default function DashboardOverviewPage() {
                     required
                     value={newDept}
                     onChange={(e) => setNewDept(e.target.value)}
-                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-1 focus:ring-black focus:border-black font-medium"
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-1 focus:ring-indigo-600 focus:border-indigo-600 font-medium"
                     placeholder="Engineering"
                   />
                 </div>
@@ -1486,7 +1615,7 @@ export default function DashboardOverviewPage() {
                     required
                     value={newTitle}
                     onChange={(e) => setNewTitle(e.target.value)}
-                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-1 focus:ring-black focus:border-black font-medium"
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-1 focus:ring-indigo-600 focus:border-indigo-600 font-medium"
                     placeholder="Senior QA Engineer"
                   />
                 </div>
@@ -1503,7 +1632,7 @@ export default function DashboardOverviewPage() {
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="px-5 py-2 rounded-xl bg-black hover:bg-slate-800 text-white font-bold shadow-sm transition-all hover:scale-105"
+                  className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold shadow-md shadow-indigo-600/20 transition-all hover:scale-105"
                 >
                   {isSubmitting ? 'Creating...' : 'Create Employee Profile'}
                 </button>

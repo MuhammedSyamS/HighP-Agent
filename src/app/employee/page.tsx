@@ -392,8 +392,20 @@ const getBrowserAppName = (): string => {
   const handleStartWork = async () => {
     setActionError('');
     setLoading(true);
+    // Optimistic UI update
+    const browserApp = getBrowserAppName();
+    setCurrentProfile((prev: any) => ({
+      ...prev,
+      currentStatus: ActivityState.ACTIVE,
+      currentApplication: browserApp,
+      currentSessionId: prev?.currentSessionId || 'session-optimistic'
+    }));
+    isWorkingRef.current = true;
+    isOnBreakRef.current = false;
+    lastActivityRef.current = Date.now();
+    setIsIdle(false);
+
     try {
-      const browserApp = getBrowserAppName();
       const startRes = await api.post('/attendance/start', {});
       if (startRes.data?.data) {
         setCurrentProfile((prev: any) => ({
@@ -409,14 +421,13 @@ const getBrowserAppName = (): string => {
         recentDurationSeconds: 1,
         idleSeconds: 0
       });
-      lastActivityRef.current = Date.now();
-      setIsIdle(false);
       await fetchMyData();
       await refreshAuth();
     } catch (err: any) {
       const msg = err.response?.data?.message || err.message || 'Failed to start work session.';
       console.error('[Employee] Start work error:', err);
       setActionError(msg);
+      await fetchMyData();
     } finally {
       setLoading(false);
     }
@@ -426,6 +437,16 @@ const getBrowserAppName = (): string => {
     if (!confirm('Are you sure you want to end your work session?')) return;
     setActionError('');
     setLoading(true);
+    // Optimistic UI update
+    setCurrentProfile((prev: any) => ({
+      ...prev,
+      currentStatus: ActivityState.OFFLINE,
+      currentSessionId: undefined,
+      currentApplication: ''
+    }));
+    isWorkingRef.current = false;
+    isOnBreakRef.current = false;
+
     try {
       await sendHeartbeat(ActivityState.OFFLINE, 1);
       await api.post('/attendance/end', {});
@@ -435,6 +456,7 @@ const getBrowserAppName = (): string => {
       const msg = err.response?.data?.message || err.message || 'Failed to end work session.';
       console.error('[Employee] End work error:', err);
       setActionError(msg);
+      await fetchMyData();
     } finally {
       setLoading(false);
     }
@@ -443,6 +465,15 @@ const getBrowserAppName = (): string => {
   const handleStartBreak = async () => {
     setActionError('');
     setLoading(true);
+    // Optimistic UI update - immediately flips button and status
+    setCurrentProfile((prev: any) => ({
+      ...prev,
+      currentStatus: ActivityState.BREAK,
+      currentApplication: 'On Break'
+    }));
+    isOnBreakRef.current = true;
+    setCurrentAppFocus('On Break');
+
     try {
       await api.post('/breaks/start', { reason: breakReason });
       await sendHeartbeat(ActivityState.BREAK, 1);
@@ -452,6 +483,7 @@ const getBrowserAppName = (): string => {
       const msg = err.response?.data?.message || err.message || 'Failed to start break.';
       console.error('[Employee] Start break error:', err);
       setActionError(msg);
+      await fetchMyData();
     } finally {
       setLoading(false);
     }
@@ -460,6 +492,18 @@ const getBrowserAppName = (): string => {
   const handleEndBreak = async () => {
     setActionError('');
     setLoading(true);
+    // Optimistic UI update - immediately returns to active work
+    const browserApp = getBrowserAppName();
+    setCurrentProfile((prev: any) => ({
+      ...prev,
+      currentStatus: ActivityState.ACTIVE,
+      currentApplication: browserApp || 'Active Workstation'
+    }));
+    isOnBreakRef.current = false;
+    lastActivityRef.current = Date.now();
+    setIsIdle(false);
+    setCurrentAppFocus(browserApp || 'Active Workstation');
+
     try {
       await api.post('/breaks/end', {});
       await sendHeartbeat(ActivityState.ACTIVE, 1);
@@ -469,6 +513,7 @@ const getBrowserAppName = (): string => {
       const msg = err.response?.data?.message || err.message || 'Failed to resume work from break.';
       console.error('[Employee] End break error:', err);
       setActionError(msg);
+      await fetchMyData();
     } finally {
       setLoading(false);
     }
@@ -476,10 +521,10 @@ const getBrowserAppName = (): string => {
 
   if (isLoading || !mounted) {
     return (
-      <div className="min-h-screen bg-[#0B0F19] flex items-center justify-center text-slate-100">
+      <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center text-slate-800">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-9 h-9 border-3 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
-          <p className="text-xs text-slate-400 font-bold tracking-wider uppercase">Loading Workspace...</p>
+          <div className="w-9 h-9 border-3 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+          <p className="text-xs text-slate-500 font-bold tracking-wider uppercase">Loading Workspace...</p>
         </div>
       </div>
     );
@@ -488,27 +533,39 @@ const getBrowserAppName = (): string => {
   if (!user) return null;
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 bg-[#0B0F19] text-slate-100">
-      <header className="bg-slate-900/80 backdrop-blur-xl border-b border-slate-800 px-4 sm:px-8 py-3 sm:py-4 flex items-center justify-between sticky top-0 z-20">
-        <div className="flex items-center gap-3">
+    <div className="flex-1 flex flex-col min-h-0 bg-[#F8FAFC] text-slate-900 selection:bg-indigo-600 selection:text-white">
+      {/* Top Header */}
+      <header className="bg-white/90 backdrop-blur-md border-b border-slate-200 px-6 sm:px-10 py-4 flex items-center justify-between sticky top-0 z-20 transition-all">
+        <div className="flex items-center gap-4">
           {user?.role !== 'EMPLOYEE' && (
             <Link
               to="/dashboard"
-              className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors border border-slate-800"
+              className="p-2 rounded-xl text-slate-600 hover:text-black hover:bg-slate-100 transition-colors border border-slate-200 shadow-2xs"
               title="Return to Dashboard"
             >
-              <ArrowLeft className="w-4 h-4 text-indigo-400" />
+              <ArrowLeft className="w-4 h-4 text-indigo-600" />
             </Link>
           )}
           <div>
-            <h1 className="text-base sm:text-lg font-black text-white tracking-tight">My Employee Workspace</h1>
-            <p className="text-[11px] sm:text-xs text-slate-400 font-medium truncate max-w-[200px] sm:max-w-none" suppressHydrationWarning>
-              {company?.name ? `${company.name} • ` : ''}Code: <span className="font-mono font-bold text-slate-200">{currentProfile?.employeeCode || 'EMP-001'}</span>{currentProfile?.department ? ` • ${currentProfile.department}` : ''}
+            <div className="flex items-center gap-2.5">
+              <h1 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
+                My Workstation Hub
+              </h1>
+              {company?.name && (
+                <span className="hidden sm:inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                  {company.name}
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-slate-500 font-medium truncate max-w-[280px] sm:max-w-none mt-0.5" suppressHydrationWarning>
+              Employee ID: <span className="font-mono font-bold text-slate-800">{currentProfile?.employeeCode || 'EMP-001'}</span>
+              {currentProfile?.department ? ` • ${currentProfile.department}` : ''}
+              {currentProfile?.designation ? ` (${currentProfile.designation})` : ''}
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 sm:gap-3">
+        <div className="flex items-center gap-3">
           <StatusBadge
             status={
               !isWorking
@@ -519,11 +576,11 @@ const getBrowserAppName = (): string => {
                 ? ActivityState.IDLE
                 : ActivityState.ACTIVE
             }
-            size="sm"
+            size="md"
           />
           <button
             onClick={logout}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-rose-400 hover:bg-rose-500/10 border border-transparent hover:border-rose-500/20 transition-all"
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-slate-600 hover:text-rose-600 hover:bg-rose-50 border border-slate-200 transition-all shadow-2xs"
             title="Sign Out"
           >
             <LogOut className="w-3.5 h-3.5" />
@@ -532,16 +589,16 @@ const getBrowserAppName = (): string => {
         </div>
       </header>
 
-      <main className="p-4 sm:p-8 pb-24 space-y-6 sm:space-y-8 flex-1 overflow-y-auto max-w-6xl mx-auto w-full">
+      <main className="p-6 sm:p-10 pb-28 space-y-8 flex-1 overflow-y-auto max-w-6xl mx-auto w-full">
         {actionError && (
-          <div className="flex items-center justify-between p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs font-semibold animate-fade-in">
+          <div className="flex items-center justify-between p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold animate-fade-in shadow-xs">
             <div className="flex items-center gap-2.5">
-              <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
               <span>{actionError}</span>
             </div>
             <button
               onClick={() => setActionError('')}
-              className="p-1 rounded-lg hover:bg-rose-500/20 text-rose-400 hover:text-white transition-colors"
+              className="p-1 rounded-lg hover:bg-rose-100 text-rose-600 transition-colors"
               title="Dismiss error"
             >
               <X className="w-4 h-4" />
@@ -549,102 +606,120 @@ const getBrowserAppName = (): string => {
           </div>
         )}
 
-        {/* Desktop Agent Auto-Download & Setup Banner */}
+        {/* Desktop Agent Setup Banner */}
         {showInstallBanner && (
-          <div className="bg-gradient-to-r from-slate-900 via-indigo-950/70 to-slate-900 border border-indigo-500/30 rounded-2xl p-4 sm:p-5 text-white shadow-xl relative overflow-hidden">
-            <div className="absolute top-0 right-0 translate-x-8 -translate-y-8 w-40 h-40 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
-
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
-              <div className="flex items-start sm:items-center gap-3.5">
-                <div className="w-11 h-11 rounded-2xl bg-indigo-600/30 border border-indigo-500/40 flex items-center justify-center shrink-0 text-indigo-400 shadow-inner">
-                  <Laptop className="w-5 h-5" />
+          <div className="bg-gradient-to-r from-indigo-50/90 via-sky-50/60 to-white border border-indigo-200/90 rounded-3xl p-6 sm:p-7 shadow-xs relative overflow-hidden">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-5 relative z-10">
+              <div className="flex items-start sm:items-center gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-indigo-600/20">
+                  <Laptop className="w-6 h-6" />
                 </div>
                 <div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="text-sm sm:text-base font-bold text-white">
-                      HighP Desktop Agent (1-Click Install)
+                  <div className="flex items-center gap-2.5 flex-wrap">
+                    <h3 className="text-sm sm:text-base font-extrabold text-slate-900 tracking-tight">
+                      HighP Desktop Agent (Windows Telemetry)
                     </h3>
-                    <span className="bg-indigo-500/20 text-indigo-300 text-[10px] font-bold px-2 py-0.5 rounded-full border border-indigo-500/30 flex items-center gap-1.5">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                      {autoDownloaded ? 'Downloaded to browser' : 'Auto-Downloading...'}
+                    <span className="bg-indigo-100 text-indigo-800 text-[11px] font-bold px-2.5 py-0.5 rounded-full border border-indigo-200 flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                      {autoDownloaded ? 'Downloaded to Browser' : 'Available for Windows'}
                     </span>
                   </div>
-                  <p className="text-xs text-slate-300 mt-1 max-w-xl leading-relaxed">
-                    {autoDownloaded ? (
-                      <>
-                        <strong className="text-indigo-300">Next Step:</strong> Click <code className="bg-slate-950 text-indigo-200 px-1 py-0.5 rounded text-[11px] border border-slate-800">HighP Agent Setup 1.0.0.exe</code> in your browser downloads bar to complete 1-click install.
-                      </>
-                    ) : (
-                      'Your download is starting automatically. Click the downloaded file to connect your computer.'
-                    )}
+                  <p className="text-xs text-slate-600 mt-1 max-w-xl leading-relaxed">
+                    Install the native background agent to track active desktop applications (VS Code, Chrome, Terminal, Office) and accurately measure focus & idle duration.
                   </p>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2.5 shrink-0 flex-wrap">
+              <div className="flex items-center gap-3 shrink-0 flex-wrap">
                 <button
                   type="button"
                   onClick={triggerAgentDownload}
-                  className="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-4 py-2 rounded-xl text-xs shadow-md shadow-indigo-600/30 transition-all hover:scale-105"
+                  className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-4 py-2.5 rounded-xl text-xs shadow-md shadow-indigo-600/20 transition-all hover:scale-105 active:scale-95"
                 >
-                  <Download className="w-3.5 h-3.5" />
-                  {autoDownloaded ? 'Download Again' : 'Download Now'}
+                  <Download className="w-4 h-4" />
+                  {autoDownloaded ? 'Download Again' : 'Download (.exe)'}
                 </button>
                 <button
                   type="button"
                   onClick={handleDismissInstall}
-                  className="inline-flex items-center gap-1.5 bg-slate-800/80 hover:bg-slate-700 text-slate-200 font-medium px-3.5 py-2 rounded-xl text-xs border border-slate-700 transition-colors"
+                  className="inline-flex items-center gap-1.5 bg-white hover:bg-slate-50 text-slate-700 font-semibold px-3.5 py-2.5 rounded-xl text-xs border border-slate-200 shadow-2xs transition-colors"
                 >
-                  <Check className="w-3.5 h-3.5 text-emerald-400" />
-                  I've Installed It
+                  <Check className="w-3.5 h-3.5 text-emerald-600" />
+                  Dismiss
                 </button>
               </div>
             </div>
           </div>
         )}
 
-        {/* Work Session & Attendance Hero Card */}
-        <div className="bg-slate-900/60 backdrop-blur-xl border border-slate-800/80 rounded-2xl sm:rounded-3xl p-5 sm:p-8 shadow-xl relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none" />
-
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5 relative z-10">
+        {/* Primary Attendance & Shift Control Hero Card */}
+        <div className="bg-white border border-slate-200/90 rounded-3xl p-7 sm:p-9 shadow-sm relative overflow-hidden">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative z-10">
             <div>
-              <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-400 block">
-                Today's Work Session
-              </span>
-              <h2 className="text-2xl sm:text-3xl font-black text-white mt-1">
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                  Current Attendance State
+                </span>
+                <span className="inline-block w-1.5 h-1.5 rounded-full bg-slate-300" />
+                <span className="text-xs font-semibold text-slate-500">
+                  {new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })}
+                </span>
+              </div>
+
+              <h2 className="text-2xl sm:text-3xl font-black text-slate-900 mt-1.5 tracking-tight font-sans">
                 {isWorking ? (
-                  <span className="text-emerald-400 flex items-center gap-2.5">
-                    <span className="w-3 h-3 rounded-full bg-emerald-400 animate-ping"></span> Active Work Session
-                  </span>
+                  isOnBreak ? (
+                    <span className="text-amber-600 flex items-center gap-3">
+                      <span className="w-3.5 h-3.5 rounded-full bg-amber-500 animate-pulse"></span>
+                      On Break ({breakReason})
+                    </span>
+                  ) : isIdle ? (
+                    <span className="text-amber-500 flex items-center gap-3">
+                      <span className="w-3.5 h-3.5 rounded-full bg-amber-400"></span>
+                      Workstation Idle
+                    </span>
+                  ) : (
+                    <span className="text-emerald-600 flex items-center gap-3">
+                      <span className="w-3.5 h-3.5 rounded-full bg-emerald-500 animate-ping"></span>
+                      Active Work Shift
+                    </span>
+                  )
                 ) : (
-                  <span className="text-slate-400">Not Clocked In</span>
+                  <span className="text-slate-400 flex items-center gap-3">
+                    <span className="w-3 h-3 rounded-full bg-slate-300"></span>
+                    Shift Not Started
+                  </span>
                 )}
               </h2>
-              <p className="text-xs text-slate-400 mt-1.5 max-w-lg leading-relaxed">
+
+              <p className="text-xs sm:text-sm text-slate-600 mt-2 max-w-xl leading-relaxed">
                 {isWorking
-                  ? 'Your session is active. You can log breaks or clock out when finishing your shift.'
-                  : 'Start your shift below to begin recording work attendance.'}
+                  ? isOnBreak
+                    ? 'You are on break. Click "Resume Work" when you return to your workstation.'
+                    : 'Your session is recording active software time, idle intervals, and productivity metrics.'
+                  : 'Start your work shift below to begin recording attendance.'}
               </p>
             </div>
 
-            <div className="flex flex-col sm:flex-row sm:items-center gap-3 relative z-10">
+            {/* Main Action Buttons */}
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3.5 relative z-10 shrink-0">
               {!isWorking ? (
                 <button
                   onClick={handleStartWork}
                   disabled={loading}
-                  className="w-full sm:w-auto justify-center flex items-center gap-2.5 px-7 py-3.5 rounded-xl sm:rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-sm shadow-xl shadow-emerald-600/30 transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
+                  className="w-full sm:w-auto justify-center flex items-center gap-2.5 px-8 py-4 rounded-2xl bg-black hover:bg-slate-800 text-white font-black text-sm shadow-md transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
                 >
-                  <Play className="w-5 h-5 fill-current" /> Start Work
+                  <Play className="w-5 h-5 fill-current text-white" />
+                  <span>Start Work Shift</span>
                 </button>
               ) : (
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
                   {!isOnBreak ? (
                     <div className="flex items-center gap-2">
                       <select
                         value={breakReason}
                         onChange={(e) => setBreakReason(e.target.value)}
-                        className="flex-1 sm:flex-none px-3.5 py-3 bg-slate-950 border border-slate-800 rounded-xl text-xs font-bold text-slate-200 focus:outline-none shadow-sm focus:border-indigo-500"
+                        className="px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-indigo-500 shadow-2xs"
                       >
                         <option value={BreakReason.LUNCH}>🥪 Lunch Break</option>
                         <option value={BreakReason.COFFEE}>☕ Coffee Break</option>
@@ -654,99 +729,137 @@ const getBrowserAppName = (): string => {
                       <button
                         onClick={handleStartBreak}
                         disabled={loading}
-                        className="flex items-center gap-1.5 px-4 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-md transition-all active:scale-95 whitespace-nowrap"
+                        className="flex items-center gap-2 px-5 py-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs shadow-sm transition-all active:scale-95 whitespace-nowrap"
                       >
-                        <Coffee className="w-4 h-4" /> Take Break
+                        <Coffee className="w-4 h-4" />
+                        <span>Take Break</span>
                       </button>
                     </div>
                   ) : (
                     <button
                       onClick={handleEndBreak}
                       disabled={loading}
-                      className="w-full sm:w-auto justify-center flex items-center gap-2 px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md transition-all active:scale-95"
+                      className="w-full sm:w-auto justify-center flex items-center gap-2 px-6 py-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md shadow-indigo-600/20 transition-all active:scale-95"
                     >
-                      <Play className="w-4 h-4 fill-current" /> Resume Work
+                      <Play className="w-4 h-4 fill-current" />
+                      <span>Resume Work Shift</span>
                     </button>
                   )}
 
                   <button
                     onClick={handleEndWork}
                     disabled={loading}
-                    className="w-full sm:w-auto justify-center flex items-center gap-2 px-5 py-3 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-md transition-all active:scale-95"
+                    className="w-full sm:w-auto justify-center flex items-center gap-2 px-5 py-3.5 rounded-xl bg-white hover:bg-rose-50 text-rose-700 font-bold text-xs border border-rose-200 shadow-2xs transition-all active:scale-95"
                   >
-                    <Square className="w-4 h-4 fill-current" /> End Work
+                    <Square className="w-4 h-4 fill-current text-rose-600" />
+                    <span>Clock Out</span>
                   </button>
                 </div>
               )}
             </div>
           </div>
 
-          {/* Metric Grid */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-8 pt-6 border-t border-slate-800 text-center relative z-10">
-            <div className="bg-slate-950/70 p-4 rounded-2xl border border-slate-800/80 shadow-md">
-              <span className="text-[11px] font-bold text-slate-400 block uppercase">Active Work</span>
-              <span className="text-2xl font-black text-emerald-400 mt-1 block tracking-tight">
+          {/* Metric Grid with generous breathing room */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6 mt-9 pt-7 border-t border-slate-100 text-center relative z-10">
+            <div className="bg-slate-50/80 p-5 rounded-2xl border border-slate-200/80 shadow-2xs transition-all hover:bg-slate-50">
+              <span className="text-[11px] font-bold text-slate-500 block uppercase tracking-wider">
+                Active Work Today
+              </span>
+              <span className="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-2 block tracking-tight font-sans">
                 {formatDuration(liveActiveSeconds)}
               </span>
+              <span className="text-[11px] font-semibold text-emerald-700 mt-1 inline-flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Productive focus
+              </span>
             </div>
-            <div className="bg-slate-950/70 p-4 rounded-2xl border border-slate-800/80 shadow-md">
-              <span className="text-[11px] font-bold text-slate-400 block uppercase">Idle Time</span>
-              <span className="text-2xl font-black text-amber-400 mt-1 block tracking-tight">
+
+            <div className="bg-slate-50/80 p-5 rounded-2xl border border-slate-200/80 shadow-2xs transition-all hover:bg-slate-50">
+              <span className="text-[11px] font-bold text-slate-500 block uppercase tracking-wider">
+                Idle Inactivity
+              </span>
+              <span className="text-2xl sm:text-3xl font-extrabold text-amber-600 mt-2 block tracking-tight font-sans">
                 {formatDuration(liveIdleSeconds)}
               </span>
-            </div>
-            <div className="bg-slate-950/70 p-4 rounded-2xl border border-slate-800/80 shadow-md">
-              <span className="text-[11px] font-bold text-slate-400 block uppercase">Break Time</span>
-              <span className="text-2xl font-black text-cyan-400 mt-1 block tracking-tight">
-                {formatDuration(liveBreakSeconds)}
+              <span className="text-[11px] font-semibold text-amber-700 mt-1 inline-flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500" /> Away from desk
               </span>
             </div>
-            <div className="bg-slate-950/70 p-4 rounded-2xl border border-slate-800/80 shadow-md">
-              <span className="text-[11px] font-bold text-slate-400 block uppercase">Current Focus</span>
-              <span className="text-sm font-bold text-white mt-1.5 block truncate">
+
+            <div className="bg-slate-50/80 p-5 rounded-2xl border border-slate-200/80 shadow-2xs transition-all hover:bg-slate-50">
+              <span className="text-[11px] font-bold text-slate-500 block uppercase tracking-wider">
+                Total Breaks
+              </span>
+              <span className="text-2xl sm:text-3xl font-extrabold text-indigo-600 mt-2 block tracking-tight font-sans">
+                {formatDuration(liveBreakSeconds)}
+              </span>
+              <span className="text-[11px] font-semibold text-indigo-700 mt-1 inline-flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" /> Logged breaks
+              </span>
+            </div>
+
+            <div className="bg-slate-50/80 p-5 rounded-2xl border border-slate-200/80 shadow-2xs transition-all hover:bg-slate-50">
+              <span className="text-[11px] font-bold text-slate-500 block uppercase tracking-wider">
+                Current Software Focus
+              </span>
+              <span className="text-sm sm:text-base font-bold text-slate-900 mt-2 block truncate">
                 {!isWorking
-                  ? 'None'
+                  ? 'Shift Inactive'
                   : isOnBreak
                   ? 'On Break'
                   : isIdle
                   ? 'Idle / Inactive'
                   : currentAppFocus}
               </span>
+              <span className="text-[11px] font-semibold text-slate-500 mt-1 inline-flex items-center gap-1">
+                <Monitor className="w-3 h-3 text-slate-400" /> Foreground app
+              </span>
             </div>
           </div>
         </div>
 
-        {/* 2-Column Section: Today's Timeline & Application Summary */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
+        {/* 2-Column Section: Today's Timeline & Software Usage */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8">
           <div className="lg:col-span-2">
             <TimelineVisualizer events={timelineEvents} dateStr={todayStr} />
           </div>
 
           <div className="space-y-6">
             {/* Transparency Pledge */}
-            <div className="bg-gradient-to-br from-slate-900 via-indigo-950/50 to-slate-900 text-white border border-indigo-500/30 rounded-3xl p-6 shadow-xl relative overflow-hidden">
-              <div className="flex items-center gap-2.5 mb-3 text-emerald-400">
-                <ShieldCheck className="w-5 h-5" />
-                <h3 className="font-bold text-sm">Transparency Guarantee</h3>
+            <div className="bg-white border border-slate-200/90 rounded-3xl p-6 sm:p-7 shadow-sm">
+              <div className="flex items-center gap-2.5 mb-3 text-indigo-600">
+                <ShieldCheck className="w-5 h-5 text-indigo-600" />
+                <h3 className="font-extrabold text-sm text-slate-900">Privacy & Transparency Guarantee</h3>
               </div>
-              <p className="text-xs text-slate-300 leading-relaxed mb-4">
-                You have full visibility over what is tracked. HighP Agent never captures private messages, passwords, keystrokes, webcam, or screen recordings.
+              <p className="text-xs text-slate-600 leading-relaxed mb-4">
+                You have full visibility over what is tracked. HighP Agent never captures private chat messages, passwords, keystrokes, webcam, or desktop screen recordings.
               </p>
-              <div className="space-y-2 text-[11px] text-slate-300">
-                <div className="flex items-center gap-2 text-emerald-400 font-semibold">
-                  <CheckCircle2 className="w-3.5 h-3.5" /> Active App Identity & Time
+              <div className="space-y-2.5 text-xs text-slate-700">
+                <div className="flex items-center gap-2 text-slate-800 font-semibold">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>Foreground App Name & Time</span>
                 </div>
-                <div className="flex items-center gap-2 text-emerald-400 font-semibold">
-                  <CheckCircle2 className="w-3.5 h-3.5" /> Session & Break Durations
+                <div className="flex items-center gap-2 text-slate-800 font-semibold">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>Work Shift & Break Durations</span>
+                </div>
+                <div className="flex items-center gap-2 text-slate-800 font-semibold">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>No Keystrokes or Screen Capture</span>
                 </div>
               </div>
             </div>
 
             {/* My Top Apps Today */}
-            <div className="bg-slate-900/60 backdrop-blur-xl border border-slate-800/80 rounded-2xl p-6 shadow-xl">
-              <h3 className="font-bold text-white text-sm mb-4 pb-2 border-b border-slate-800">
-                My Software Usage Today
-              </h3>
+            <div className="bg-white border border-slate-200/90 rounded-3xl p-6 sm:p-7 shadow-sm">
+              <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
+                <h3 className="font-extrabold text-slate-900 text-sm">
+                  My Software Usage Today
+                </h3>
+                <span className="text-[11px] font-semibold text-slate-400">
+                  {appUsages.length} apps
+                </span>
+              </div>
+
               {appUsages.filter(
                 (a) =>
                   !a.applicationName.toLowerCase().includes('highp') &&
@@ -754,7 +867,7 @@ const getBrowserAppName = (): string => {
                   !a.applicationName.toLowerCase().includes('highphaus') &&
                   !a.applicationName.toLowerCase().includes('electron')
               ).length === 0 ? (
-                <p className="text-xs text-slate-500 py-6 text-center">No app activity recorded yet today.</p>
+                <p className="text-xs text-slate-400 py-6 text-center">No app activity recorded yet today.</p>
               ) : (
                 <div className="space-y-3">
                   {appUsages
@@ -766,9 +879,9 @@ const getBrowserAppName = (): string => {
                         !a.applicationName.toLowerCase().includes('electron')
                     )
                     .map((app, i) => (
-                      <div key={i} className="flex items-center justify-between text-xs font-semibold">
-                        <span className="text-slate-200 truncate max-w-[150px]">{app.applicationName}</span>
-                        <span className="text-slate-400 font-mono text-[11px]">{formatDuration(app.totalSeconds)}</span>
+                      <div key={i} className="flex items-center justify-between text-xs py-1.5">
+                        <span className="text-slate-800 font-bold truncate max-w-[170px]">{app.applicationName}</span>
+                        <span className="text-indigo-600 font-mono font-bold text-xs">{formatDuration(app.totalSeconds)}</span>
                       </div>
                     ))}
                 </div>
