@@ -167,15 +167,15 @@ export default function EmployeeWorkspacePage() {
           sessActive = currentSess.activeSeconds || 0;
           sessIdle = currentSess.idleSeconds || 0;
           sessBreak = currentSess.breakSeconds || 0;
-          if (currentSess.status === 'ACTIVE') {
-            const elapsed = Math.max(0, Math.floor((Date.now() - new Date(currentSess.startedAt).getTime()) / 1000));
-            sessActive = Math.max(sessActive, elapsed - sessIdle - sessBreak);
-          }
         }
 
-        setLiveActiveSeconds((s) => Math.max(s, p.todayActiveSeconds || 0, sessActive));
-        setLiveIdleSeconds((s) => Math.max(s, p.todayIdleSeconds || 0, sessIdle));
-        setLiveBreakSeconds((s) => Math.max(s, p.todayBreakSeconds || 0, sessBreak));
+        const authoritativeActive = Math.max(p.todayActiveSeconds || 0, sessActive);
+        const authoritativeIdle = Math.max(p.todayIdleSeconds || 0, sessIdle);
+        const authoritativeBreak = Math.max(p.todayBreakSeconds || 0, sessBreak);
+
+        setLiveActiveSeconds(authoritativeActive);
+        setLiveIdleSeconds(authoritativeIdle);
+        setLiveBreakSeconds(authoritativeBreak);
         if (p.currentApplication) setCurrentAppFocus(p.currentApplication);
       }
       if (liveRes?.data?.data) {
