@@ -21,7 +21,7 @@ export const Sidebar: React.FC = () => {
   const { user, company, logout } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  const isHR = user?.role === UserRole.HR;
+  const isHR = user?.role === UserRole.HR || user?.role === UserRole.OWNER || user?.role === UserRole.ADMIN;
   const isManager = user?.role === UserRole.MANAGER;
   const canAccessDashboard = isHR || isManager;
 
