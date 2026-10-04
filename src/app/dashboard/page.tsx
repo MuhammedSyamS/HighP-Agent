@@ -28,6 +28,8 @@ import {
   Radio,
   Briefcase,
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
   Shield,
   Layers,
   Globe,
@@ -136,6 +138,71 @@ export default function DashboardOverviewPage() {
 
   // Section 20 & 21: Application Activity & Analytics State
   const [activityRecords, setActivityRecords] = useState<any[]>([]);
+  const [activityViewMode, setActivityViewMode] = useState<'grouped' | 'raw'>('grouped');
+  const [expandedAdminKeys, setExpandedAdminKeys] = useState<Record<string, boolean>>({});
+
+  const toggleAdminExpand = (key: string) => {
+    setExpandedAdminKeys((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const groupedActivityRecords = React.useMemo(() => {
+    const map = new Map<string, any>();
+
+    for (const rec of activityRecords) {
+      const u = rec.employeeId?.userId;
+      const empId = rec.employeeId?._id || 'unknown';
+      const appName = (rec.applicationName || 'Unknown').trim();
+      const groupKey = `${empId}_${appName}`;
+
+      if (!map.has(groupKey)) {
+        map.set(groupKey, {
+          groupKey,
+          applicationName: appName,
+          processName: rec.processName,
+          category: rec.category || 'Other',
+          employeeId: rec.employeeId,
+          employeeName: u ? `${u.firstName || ''} ${u.lastName || ''}`.trim() || 'Employee' : 'Employee',
+          employeeCode: rec.employeeId?.employeeCode || '',
+          totalDurationSeconds: 0,
+          sessionCount: 0,
+          earliestStarted: rec.startedAt,
+          latestLastSeen: rec.lastSeenAt || rec.endedAt || rec.startedAt,
+          isLiveNow: !!rec.isLiveNow,
+          sessions: []
+        });
+      }
+
+      const item = map.get(groupKey)!;
+      item.totalDurationSeconds += (rec.durationSeconds || rec.todayTotalSeconds || 0);
+      item.sessionCount += 1;
+      if (rec.isLiveNow) item.isLiveNow = true;
+      if (!item.processName && rec.processName) item.processName = rec.processName;
+
+      if (rec.startedAt && new Date(rec.startedAt) < new Date(item.earliestStarted)) {
+        item.earliestStarted = rec.startedAt;
+      }
+      const end = rec.lastSeenAt || rec.endedAt || rec.startedAt;
+      if (end && new Date(end) > new Date(item.latestLastSeen)) {
+        item.latestLastSeen = end;
+      }
+
+      item.sessions.push({
+        id: rec._id || rec.eventId,
+        startedAt: rec.startedAt,
+        endedAt: rec.endedAt || rec.lastSeenAt,
+        durationSeconds: rec.durationSeconds || 0,
+        isLiveNow: !!rec.isLiveNow,
+        processName: rec.processName
+      });
+    }
+
+    for (const item of map.values()) {
+      item.sessions.sort((a: any, b: any) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime());
+    }
+
+    return Array.from(map.values()).sort((a, b) => b.totalDurationSeconds - a.totalDurationSeconds);
+  }, [activityRecords]);
+
   const [activityAppFilter, setActivityAppFilter] = useState('');
   const [activityCategoryFilter, setActivityCategoryFilter] = useState('ALL');
   const [activityEmployeeFilter, setActivityEmployeeFilter] = useState('ALL');
@@ -1409,6 +1476,42 @@ export default function DashboardOverviewPage() {
               </div>
             </div>
 
+            {/* Table View Mode Switcher & Counter */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
+              <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl border border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setActivityViewMode('grouped')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                    activityViewMode === 'grouped'
+                      ? 'bg-white text-indigo-700 shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <Layers className="w-3.5 h-3.5" />
+                  <span>Grouped by Software ({groupedActivityRecords.length})</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActivityViewMode('raw')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                    activityViewMode === 'raw'
+                      ? 'bg-white text-indigo-700 shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <List className="w-3.5 h-3.5" />
+                  <span>Raw Switches ({activityRecords.length})</span>
+                </button>
+              </div>
+
+              <span className="text-xs text-slate-500 font-medium">
+                {activityViewMode === 'grouped'
+                  ? `Consolidates repeated usage of the same application into expandable timestamp sessions.`
+                  : `Showing sequential switch-by-switch log.`}
+              </span>
+            </div>
+
             {/* Activity Records Table */}
             <div className="overflow-x-auto rounded-2xl border border-slate-200">
               <table className="w-full text-left text-xs">
@@ -1417,93 +1520,226 @@ export default function DashboardOverviewPage() {
                     <th className="px-5 py-3.5">Application</th>
                     <th className="px-5 py-3.5">Category</th>
                     <th className="px-5 py-3.5">Employee</th>
-                    <th className="px-5 py-3.5">Started</th>
+                    <th className="px-5 py-3.5">First Started</th>
                     <th className="px-5 py-3.5">Last Seen</th>
-                    <th className="px-5 py-3.5">Duration</th>
-                    <th className="px-5 py-3.5">Status</th>
+                    <th className="px-5 py-3.5">Total Duration</th>
+                    <th className="px-5 py-3.5 text-right">{activityViewMode === 'grouped' ? 'Sessions & Timestamps' : 'Status'}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
-                  {activityRecords.length === 0 ? (
-                    <tr>
-                      <td colSpan={7} className="px-6 py-12 text-center text-slate-400">
-                        <Clock className="w-7 h-7 text-slate-300 mx-auto mb-2" />
-                        No activity session records match your filter criteria.
-                      </td>
-                    </tr>
-                  ) : (
-                    activityRecords.map((rec, i) => {
-                      const visuals = getAppVisuals(rec.applicationName);
-                      const Icon = visuals.icon;
-                      const u = rec.employeeId?.userId;
-                      const empName = u ? `${u.firstName || ''} ${u.lastName || ''}`.trim() || 'Employee' : 'Employee';
-                      const startedFormatted = rec.startedAt
-                        ? new Date(rec.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                        : '—';
-                      const lastSeenFormatted = rec.lastSeenAt || rec.endedAt
-                        ? new Date(rec.lastSeenAt || rec.endedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                        : '—';
-                      const isLive = rec.isLiveNow || rec.status === 'ACTIVE';
+                  {activityViewMode === 'grouped' ? (
+                    groupedActivityRecords.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="px-6 py-12 text-center text-slate-400">
+                          <Clock className="w-7 h-7 text-slate-300 mx-auto mb-2" />
+                          No activity session records match your filter criteria.
+                        </td>
+                      </tr>
+                    ) : (
+                      groupedActivityRecords.map((grp) => {
+                        const visuals = getAppVisuals(grp.applicationName);
+                        const Icon = visuals.icon;
+                        const startedFormatted = grp.earliestStarted
+                          ? new Date(grp.earliestStarted).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                          : '—';
+                        const lastSeenFormatted = grp.latestLastSeen
+                          ? new Date(grp.latestLastSeen).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                          : '—';
+                        const isExpanded = !!expandedAdminKeys[grp.groupKey];
 
-                      return (
-                        <tr key={rec._id || rec.eventId || i} className="hover:bg-slate-50/80 transition-colors group">
-                          <td className="px-5 py-3.5">
-                            <div className="flex items-center gap-2.5">
-                              <div className={`p-1.5 rounded-lg border shrink-0 ${visuals.color}`}>
-                                <Icon className="w-3.5 h-3.5" />
-                              </div>
-                              <div className="min-w-0">
-                                <span className="font-bold text-slate-900 group-hover:text-indigo-600 transition-colors block truncate max-w-[180px]">
-                                  {rec.applicationName}
+                        return (
+                          <React.Fragment key={grp.groupKey}>
+                            <tr className="hover:bg-slate-50/80 transition-colors group">
+                              <td className="px-5 py-3.5">
+                                <div className="flex items-center gap-2.5">
+                                  <div className={`p-1.5 rounded-lg border shrink-0 ${visuals.color}`}>
+                                    <Icon className="w-3.5 h-3.5" />
+                                  </div>
+                                  <div className="min-w-0">
+                                    <span className="font-bold text-slate-900 group-hover:text-indigo-600 transition-colors block truncate max-w-[180px]">
+                                      {grp.applicationName}
+                                    </span>
+                                    {grp.processName && (
+                                      <span className="text-[10px] text-slate-500 font-mono block">
+                                        {grp.processName}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              </td>
+
+                              <td className="px-5 py-3.5">
+                                <span className="px-2.5 py-1 bg-slate-100 rounded-full text-[11px] font-semibold text-slate-700 border border-slate-200">
+                                  {grp.category || 'Other'}
                                 </span>
-                                {rec.processName && (
-                                  <span className="text-[10px] text-slate-500 font-mono block">
-                                    {rec.processName}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          </td>
+                              </td>
 
-                          <td className="px-5 py-3.5">
-                            <span className="px-2.5 py-1 bg-slate-100 rounded-full text-[11px] font-semibold text-slate-700 border border-slate-200">
-                              {rec.category || 'Other'}
-                            </span>
-                          </td>
+                              <td className="px-5 py-3.5">
+                                <div>
+                                  <span className="font-semibold text-slate-900 block">{grp.employeeName}</span>
+                                  <span className="text-[10px] text-slate-500">{grp.employeeCode || ''}</span>
+                                </div>
+                              </td>
 
-                          <td className="px-5 py-3.5">
-                            <div>
-                              <span className="font-semibold text-slate-900 block">{empName}</span>
-                              <span className="text-[10px] text-slate-500">{rec.employeeId?.employeeCode || ''}</span>
-                            </div>
-                          </td>
+                              <td className="px-5 py-3.5 font-mono text-slate-600">{startedFormatted}</td>
+                              <td className="px-5 py-3.5 font-mono text-slate-500">{lastSeenFormatted}</td>
 
-                          <td className="px-5 py-3.5 font-mono text-slate-600">{startedFormatted}</td>
-                          <td className="px-5 py-3.5 font-mono text-slate-500">{lastSeenFormatted}</td>
+                              <td className="px-5 py-3.5 font-mono font-bold text-emerald-700 text-sm">
+                                {formatDuration(grp.totalDurationSeconds)}
+                              </td>
 
-                          <td className="px-5 py-3.5 font-mono font-bold text-emerald-700">
-                            {formatDuration(rec.durationSeconds || rec.todayTotalSeconds || 0)}
-                          </td>
+                              <td className="px-5 py-3.5 text-right">
+                                <div className="flex items-center justify-end gap-2">
+                                  {grp.isLiveNow && (
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
+                                      Live
+                                    </span>
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleAdminExpand(grp.groupKey)}
+                                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white hover:bg-indigo-50 text-indigo-700 border border-slate-200 hover:border-indigo-200 text-xs font-bold transition-all shadow-2xs"
+                                  >
+                                    <span>{isExpanded ? 'Hide' : `View Timestamps (${grp.sessionCount})`}</span>
+                                    {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
 
-                          <td className="px-5 py-3.5">
-                            {isLive ? (
-                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
-                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
-                                Active
-                              </span>
-                            ) : rec.type === 'IDLE_INTERVAL' || rec.status === 'IDLE' ? (
-                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
-                                Idle
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
-                                Completed
-                              </span>
+                            {/* Accordion Sub-Row for Timestamps */}
+                            {isExpanded && (
+                              <tr className="bg-slate-50/70 border-b border-slate-200">
+                                <td colSpan={7} className="px-6 py-3.5">
+                                  <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-2xs space-y-2">
+                                    <div className="flex items-center justify-between text-xs font-bold text-slate-600 pb-2 border-b border-slate-100">
+                                      <span>Detailed Sessions for {grp.applicationName}</span>
+                                      <span className="text-slate-400 font-medium">{grp.sessionCount} recorded intervals</span>
+                                    </div>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 pt-1 max-h-48 overflow-y-auto pr-1">
+                                      {grp.sessions.map((sess: any, sIdx: number) => {
+                                        const sStart = sess.startedAt ? new Date(sess.startedAt) : null;
+                                        const sEnd = sess.endedAt ? new Date(sess.endedAt) : null;
+                                        const sStartStr =
+                                          sStart && !isNaN(sStart.getTime())
+                                            ? sStart.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+                                            : '—';
+                                        const sEndStr =
+                                          sEnd && !isNaN(sEnd.getTime())
+                                            ? sEnd.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+                                            : 'Now';
+
+                                        return (
+                                          <div
+                                            key={sess.id || sIdx}
+                                            className="flex items-center justify-between px-3 py-2 bg-slate-50 border border-slate-200/80 rounded-lg text-xs"
+                                          >
+                                            <div className="flex items-center gap-1.5">
+                                              <span className="w-4 h-4 rounded bg-white border border-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-400">
+                                                #{grp.sessions.length - sIdx}
+                                              </span>
+                                              <span className="font-mono text-slate-700">
+                                                {sStartStr} → {sEndStr}
+                                              </span>
+                                            </div>
+                                            <span className="font-mono font-bold text-indigo-700 bg-white px-1.5 py-0.5 rounded border border-slate-200 text-[11px]">
+                                              {formatDuration(sess.durationSeconds)}
+                                            </span>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                </td>
+                              </tr>
                             )}
-                          </td>
-                        </tr>
-                      );
-                    })
+                          </React.Fragment>
+                        );
+                      })
+                    )
+                  ) : (
+                    activityRecords.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="px-6 py-12 text-center text-slate-400">
+                          <Clock className="w-7 h-7 text-slate-300 mx-auto mb-2" />
+                          No activity session records match your filter criteria.
+                        </td>
+                      </tr>
+                    ) : (
+                      activityRecords.map((rec, i) => {
+                        const visuals = getAppVisuals(rec.applicationName);
+                        const Icon = visuals.icon;
+                        const u = rec.employeeId?.userId;
+                        const empName = u ? `${u.firstName || ''} ${u.lastName || ''}`.trim() || 'Employee' : 'Employee';
+                        const startedFormatted = rec.startedAt
+                          ? new Date(rec.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                          : '—';
+                        const lastSeenFormatted = rec.lastSeenAt || rec.endedAt
+                          ? new Date(rec.lastSeenAt || rec.endedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                          : '—';
+                        const isLive = rec.isLiveNow || rec.status === 'ACTIVE';
+
+                        return (
+                          <tr key={rec._id || rec.eventId || i} className="hover:bg-slate-50/80 transition-colors group">
+                            <td className="px-5 py-3.5">
+                              <div className="flex items-center gap-2.5">
+                                <div className={`p-1.5 rounded-lg border shrink-0 ${visuals.color}`}>
+                                  <Icon className="w-3.5 h-3.5" />
+                                </div>
+                                <div className="min-w-0">
+                                  <span className="font-bold text-slate-900 group-hover:text-indigo-600 transition-colors block truncate max-w-[180px]">
+                                    {rec.applicationName}
+                                  </span>
+                                  {rec.processName && (
+                                    <span className="text-[10px] text-slate-500 font-mono block">
+                                      {rec.processName}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </td>
+
+                            <td className="px-5 py-3.5">
+                              <span className="px-2.5 py-1 bg-slate-100 rounded-full text-[11px] font-semibold text-slate-700 border border-slate-200">
+                                {rec.category || 'Other'}
+                              </span>
+                            </td>
+
+                            <td className="px-5 py-3.5">
+                              <div>
+                                <span className="font-semibold text-slate-900 block">{empName}</span>
+                                <span className="text-[10px] text-slate-500">{rec.employeeId?.employeeCode || ''}</span>
+                              </div>
+                            </td>
+
+                            <td className="px-5 py-3.5 font-mono text-slate-600">{startedFormatted}</td>
+                            <td className="px-5 py-3.5 font-mono text-slate-500">{lastSeenFormatted}</td>
+
+                            <td className="px-5 py-3.5 font-mono font-bold text-emerald-700">
+                              {formatDuration(rec.durationSeconds || rec.todayTotalSeconds || 0)}
+                            </td>
+
+                            <td className="px-5 py-3.5">
+                              {isLive ? (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
+                                  Active
+                                </span>
+                              ) : rec.type === 'IDLE_INTERVAL' || rec.status === 'IDLE' ? (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                                  Idle
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                                  Completed
+                                </span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )
                   )}
                 </tbody>
               </table>
