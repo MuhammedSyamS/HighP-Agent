@@ -62,13 +62,57 @@ export default function EmployeeWorkspacePage() {
     }
   }, [user, isLoading, navigate]);
 
-  // Real-Time Live Tracking Engine State
-  const [liveActiveSeconds, setLiveActiveSeconds] = useState(0);
-  const [liveIdleSeconds, setLiveIdleSeconds] = useState(0);
-  const [liveBreakSeconds, setLiveBreakSeconds] = useState(0);
+  // Real-Time Live Tracking Engine State with localStorage persistence across page reloads
+  const [liveActiveSeconds, setLiveActiveSeconds] = useState<number>(() => {
+    try {
+      const today = new Date().toISOString().slice(0, 10);
+      const savedDate = localStorage.getItem('highp_live_date');
+      const savedActive = localStorage.getItem('highp_live_active_sec');
+      if (savedDate === today && savedActive) {
+        return Math.max(0, parseInt(savedActive, 10) || 0);
+      }
+    } catch {}
+    return 0;
+  });
+
+  const [liveIdleSeconds, setLiveIdleSeconds] = useState<number>(() => {
+    try {
+      const today = new Date().toISOString().slice(0, 10);
+      const savedDate = localStorage.getItem('highp_live_date');
+      const savedIdle = localStorage.getItem('highp_live_idle_sec');
+      if (savedDate === today && savedIdle) {
+        return Math.max(0, parseInt(savedIdle, 10) || 0);
+      }
+    } catch {}
+    return 0;
+  });
+
+  const [liveBreakSeconds, setLiveBreakSeconds] = useState<number>(() => {
+    try {
+      const today = new Date().toISOString().slice(0, 10);
+      const savedDate = localStorage.getItem('highp_live_date');
+      const savedBreak = localStorage.getItem('highp_live_break_sec');
+      if (savedDate === today && savedBreak) {
+        return Math.max(0, parseInt(savedBreak, 10) || 0);
+      }
+    } catch {}
+    return 0;
+  });
+
   const [isIdle, setIsIdle] = useState(false);
   const [currentAppFocus, setCurrentAppFocus] = useState('Active Workstation');
   const lastActivityRef = React.useRef(Date.now());
+
+  // Save live counters to localStorage so page refresh never wipes today's tracked time
+  useEffect(() => {
+    try {
+      const today = new Date().toISOString().slice(0, 10);
+      localStorage.setItem('highp_live_date', today);
+      if (liveActiveSeconds > 0) localStorage.setItem('highp_live_active_sec', String(liveActiveSeconds));
+      if (liveIdleSeconds > 0) localStorage.setItem('highp_live_idle_sec', String(liveIdleSeconds));
+      if (liveBreakSeconds > 0) localStorage.setItem('highp_live_break_sec', String(liveBreakSeconds));
+    } catch {}
+  }, [liveActiveSeconds, liveIdleSeconds, liveBreakSeconds]);
 
   const triggerAgentDownload = useCallback(() => {
     try {
@@ -114,9 +158,24 @@ export default function EmployeeWorkspacePage() {
       if (empRes.data?.data?.profile) {
         const p = empRes.data.data.profile;
         setCurrentProfile(p);
-        setLiveActiveSeconds((s) => Math.max(s, p.todayActiveSeconds || 0));
-        setLiveIdleSeconds((s) => Math.max(s, p.todayIdleSeconds || 0));
-        setLiveBreakSeconds((s) => Math.max(s, p.todayBreakSeconds || 0));
+
+        const currentSess = empRes.data?.data?.currentSession;
+        let sessActive = 0;
+        let sessIdle = 0;
+        let sessBreak = 0;
+        if (currentSess && currentSess.startedAt) {
+          sessActive = currentSess.activeSeconds || 0;
+          sessIdle = currentSess.idleSeconds || 0;
+          sessBreak = currentSess.breakSeconds || 0;
+          if (currentSess.status === 'ACTIVE') {
+            const elapsed = Math.max(0, Math.floor((Date.now() - new Date(currentSess.startedAt).getTime()) / 1000));
+            sessActive = Math.max(sessActive, elapsed - sessIdle - sessBreak);
+          }
+        }
+
+        setLiveActiveSeconds((s) => Math.max(s, p.todayActiveSeconds || 0, sessActive));
+        setLiveIdleSeconds((s) => Math.max(s, p.todayIdleSeconds || 0, sessIdle));
+        setLiveBreakSeconds((s) => Math.max(s, p.todayBreakSeconds || 0, sessBreak));
         if (p.currentApplication) setCurrentAppFocus(p.currentApplication);
       }
       if (liveRes?.data?.data) {

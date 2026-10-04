@@ -79,17 +79,37 @@ const getAppVisuals = (appName?: string) => {
 };
 
 export default function DashboardOverviewPage() {
-  const [overview, setOverview] = useState<IDashboardOverview>({
-    totalEmployees: 0,
-    activeNow: 0,
-    idleNow: 0,
-    onBreakNow: 0,
-    offlineNow: 0,
-    currentlyWorking: 0,
-    totalActiveSecondsToday: 0,
-    totalIdleSecondsToday: 0,
-    totalBreakSecondsToday: 0
+  const [overview, setOverview] = useState<IDashboardOverview>(() => {
+    try {
+      const today = new Date().toISOString().slice(0, 10);
+      const saved = localStorage.getItem('highp_dashboard_overview');
+      const savedDate = localStorage.getItem('highp_dashboard_date');
+      if (saved && savedDate === today) {
+        return JSON.parse(saved);
+      }
+    } catch {}
+    return {
+      totalEmployees: 0,
+      activeNow: 0,
+      idleNow: 0,
+      onBreakNow: 0,
+      offlineNow: 0,
+      currentlyWorking: 0,
+      totalActiveSecondsToday: 0,
+      totalIdleSecondsToday: 0,
+      totalBreakSecondsToday: 0
+    };
   });
+
+  useEffect(() => {
+    try {
+      if (overview.totalActiveSecondsToday > 0 || overview.currentlyWorking > 0) {
+        const today = new Date().toISOString().slice(0, 10);
+        localStorage.setItem('highp_dashboard_date', today);
+        localStorage.setItem('highp_dashboard_overview', JSON.stringify(overview));
+      }
+    } catch {}
+  }, [overview]);
 
   const [employees, setEmployees] = useState<any[]>([]);
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
