@@ -18,7 +18,8 @@ import {
   Calendar,
   Zap,
   Activity,
-  UserCheck
+  UserCheck,
+  Globe
 } from 'lucide-react';
 import { ActivityState } from '@highp/shared';
 
@@ -156,9 +157,17 @@ export default function EmployeeDetailPage() {
           <div className="flex items-center gap-6 text-xs text-slate-300 bg-slate-950/60 px-6 py-3.5 rounded-2xl border border-slate-800 relative z-10">
             <div>
               <span className="text-[10px] font-bold text-slate-400 block uppercase tracking-wider">Current Focus</span>
-              <span className="font-bold text-white mt-0.5 block truncate max-w-[150px]">
-                {profile?.currentStatus === ActivityState.OFFLINE ? 'None (Offline)' : profile?.currentApplication || 'Desktop'}
-              </span>
+              <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                <span className="font-bold text-white block truncate max-w-[150px]">
+                  {profile?.currentStatus === ActivityState.OFFLINE ? 'None (Offline)' : profile?.currentApplication || 'Desktop'}
+                </span>
+                {profile?.currentWebsiteDomain && profile?.currentStatus !== ActivityState.OFFLINE && (
+                  <span className="inline-flex items-center gap-1 text-[11px] font-mono text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded border border-cyan-500/20">
+                    <Globe className="w-3 h-3 text-cyan-400" />
+                    {profile.currentWebsiteDomain}
+                  </span>
+                )}
+              </div>
             </div>
             <div className="h-8 w-px bg-slate-800" />
             <div>
@@ -240,6 +249,49 @@ export default function EmployeeDetailPage() {
                         <div className="w-full h-2 bg-slate-950 rounded-full overflow-hidden border border-slate-800">
                           <div
                             className="h-full bg-gradient-to-r from-indigo-500 to-violet-500 rounded-full transition-all duration-500"
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Website Telemetry */}
+            <div className="bg-slate-900/60 backdrop-blur-xl border border-slate-800/80 rounded-2xl p-6 shadow-xl">
+              <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-800">
+                <div className="flex items-center gap-2">
+                  <Globe className="w-4 h-4 text-cyan-400" />
+                  <h3 className="text-sm font-bold text-white">Website Activity</h3>
+                </div>
+                <span className="text-[11px] font-bold text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded-md border border-cyan-500/20">
+                  {dateStr}
+                </span>
+              </div>
+
+              {(!employeeData?.topWebsites || employeeData.topWebsites.length === 0) ? (
+                <p className="text-xs text-slate-500 py-6 text-center">No website activity recorded on this date.</p>
+              ) : (
+                <div className="space-y-3">
+                  {employeeData.topWebsites.map((web: any, idx: number) => {
+                    const totalWebSec = employeeData.topWebsites.reduce((a: number, c: any) => a + (c.totalSeconds || 0), 0);
+                    const pct = totalWebSec > 0 ? Math.round((web.totalSeconds / totalWebSec) * 100) : 0;
+                    return (
+                      <div key={idx} className="space-y-1.5">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="font-mono text-cyan-300 font-semibold truncate max-w-[160px] flex items-center gap-1.5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 shrink-0" />
+                            {web.domain}
+                          </span>
+                          <span className="text-slate-400 font-semibold font-mono">
+                            {formatDuration(web.totalSeconds)} ({pct}%)
+                          </span>
+                        </div>
+                        <div className="w-full h-1.5 bg-slate-950 rounded-full overflow-hidden border border-slate-800">
+                          <div
+                            className="h-full bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full transition-all duration-500"
                             style={{ width: `${pct}%` }}
                           />
                         </div>
