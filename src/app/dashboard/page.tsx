@@ -41,7 +41,10 @@ import {
   FileSpreadsheet,
   Compass,
   Cpu,
-  PieChart
+  PieChart,
+  Calendar,
+  CalendarCheck,
+  Check
 } from 'lucide-react';
 import { ActivityState, IDashboardOverview, UserRole } from '@highp/shared';
 
@@ -119,8 +122,32 @@ export default function DashboardOverviewPage() {
   const [departmentFilter, setDepartmentFilter] = useState<string>('ALL');
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
-  const [dashboardTab, setDashboardTab] = useState<'employees' | 'apps' | 'activity'>('employees');
+  const [dashboardTab, setDashboardTab] = useState<'employees' | 'attendance' | 'apps' | 'activity'>('employees');
   const [isLoading, setLoading] = useState(true);
+
+  // Dedicated Attendance Roster State
+  const [attendanceDate, setAttendanceDate] = useState(new Date().toISOString().slice(0, 10));
+  const [attendanceRoster, setAttendanceRoster] = useState<any[]>([]);
+  const [attendanceSummary, setAttendanceSummary] = useState<any>(null);
+  const [isAttendanceLoading, setIsAttendanceLoading] = useState(false);
+  const [attendanceSearchTerm, setAttendanceSearchTerm] = useState('');
+  const [attendanceStatusFilter, setAttendanceStatusFilter] = useState('ALL');
+  const [expandedAttendanceSessions, setExpandedAttendanceSessions] = useState<Record<string, boolean>>({});
+
+  const toggleAttendanceExpand = (empId: string) => {
+    setExpandedAttendanceSessions((prev) => ({ ...prev, [empId]: !prev[empId] }));
+  };
+
+  const formatTimeOnly = (dateVal?: string | Date | null) => {
+    if (!dateVal) return null;
+    try {
+      const d = new Date(dateVal);
+      if (isNaN(d.getTime())) return null;
+      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    } catch {
+      return null;
+    }
+  };
 
   // Live Stream Events Feed
   const [recentLiveEvents, setRecentLiveEvents] = useState<
@@ -254,6 +281,26 @@ export default function DashboardOverviewPage() {
       setIsActivityLoading(false);
     }
   }, [activityDateFilter, activityCategoryFilter, activityAppFilter, activityEmployeeFilter, activityStatusFilter]);
+
+  const fetchAttendanceRoster = useCallback(async (targetDate?: string) => {
+    setIsAttendanceLoading(true);
+    try {
+      const d = targetDate || attendanceDate;
+      const res = await api.get(`/attendance/roster?date=${d}`);
+      if (res.data?.data) {
+        setAttendanceRoster(res.data.data.roster || []);
+        setAttendanceSummary(res.data.data.summary || null);
+      }
+    } catch (err) {
+      console.error('[Dashboard] Error fetching attendance roster:', err);
+    } finally {
+      setIsAttendanceLoading(false);
+    }
+  }, [attendanceDate]);
+
+  useEffect(() => {
+    fetchAttendanceRoster(attendanceDate);
+  }, [attendanceDate, fetchAttendanceRoster]);
 
   const fetchDashboardData = useCallback(async () => {
     try {
@@ -507,12 +554,17 @@ export default function DashboardOverviewPage() {
         });
       };
 
+      const handleSessionChange = () => {
+        fetchDashboardData();
+        fetchAttendanceRoster();
+      };
+
       socket.on('agent:current-application', handleCurrentApplication);
       socket.on('employee:telemetry_updated', handleTelemetryUpdated);
       socket.on('employee:status_changed', handleStatusChange);
       socket.on('employee:activity_changed', handleActivityChange);
-      socket.on('employee:session_started', fetchDashboardData);
-      socket.on('employee:session_ended', fetchDashboardData);
+      socket.on('employee:session_started', handleSessionChange);
+      socket.on('employee:session_ended', handleSessionChange);
       socket.on('employee:break_started', fetchDashboardData);
       socket.on('employee:break_ended', fetchDashboardData);
 
@@ -521,13 +573,13 @@ export default function DashboardOverviewPage() {
         socket.off('employee:telemetry_updated', handleTelemetryUpdated);
         socket.off('employee:status_changed', handleStatusChange);
         socket.off('employee:activity_changed', handleActivityChange);
-        socket.off('employee:session_started', fetchDashboardData);
-        socket.off('employee:session_ended', fetchDashboardData);
+        socket.off('employee:session_started', handleSessionChange);
+        socket.off('employee:session_ended', handleSessionChange);
         socket.off('employee:break_started', fetchDashboardData);
         socket.off('employee:break_ended', fetchDashboardData);
       };
     }
-  }, [fetchDashboardData]);
+  }, [fetchDashboardData, fetchAttendanceRoster]);
 
   const handleCreateEmployee = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -863,10 +915,10 @@ export default function DashboardOverviewPage() {
                           <Icon className="w-4 h-4 shrink-0" />
                           <span className="truncate max-w-[170px]">{worker.currentApplication}</span>
                         </div>
-                        {worker.currentWebsite?.domain && (
+                        {(worker.currentWebsite?.domain || worker.currentWebsiteDomain) && (
                           <span className="inline-flex items-center gap-1 text-[11px] font-mono text-cyan-800 bg-cyan-50 px-2.5 py-1 rounded-xl border border-cyan-200">
                             <Globe className="w-3.5 h-3.5 text-cyan-700" />
-                            {worker.currentWebsite.domain}
+                            {worker.currentWebsite?.domain || worker.currentWebsiteDomain}
                           </span>
                         )}
                       </div>
@@ -959,6 +1011,23 @@ export default function DashboardOverviewPage() {
               dashboardTab === 'employees' ? 'bg-indigo-50 text-indigo-700' : 'bg-slate-200/80 text-slate-600'
             }`}>
               {filteredEmployees.length}
+            </span>
+          </button>
+
+          <button
+            onClick={() => setDashboardTab('attendance')}
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+              dashboardTab === 'attendance'
+                ? 'bg-white text-slate-900 shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+            }`}
+          >
+            <CalendarCheck className="w-4 h-4 text-indigo-600" />
+            <span>Attendance & Work Logs</span>
+            <span className={`text-[11px] px-2 py-0.5 rounded-full font-mono font-bold ${
+              dashboardTab === 'attendance' ? 'bg-indigo-50 text-indigo-700' : 'bg-slate-200/80 text-slate-600'
+            }`}>
+              {attendanceSummary ? `${attendanceSummary.presentCount}/${attendanceSummary.totalEmployees}` : 'Daily'}
             </span>
           </button>
 
@@ -1093,6 +1162,8 @@ export default function DashboardOverviewPage() {
                         <th className="px-6 py-4">Status</th>
                         <th className="px-6 py-4">Tracking Source</th>
                         <th className="px-6 py-4">Current Focus Application</th>
+                        <th className="px-6 py-4 text-emerald-800">Start Work</th>
+                        <th className="px-6 py-4 text-slate-800">End Work</th>
                         <th className="px-6 py-4">Active Work</th>
                         <th className="px-6 py-4">Idle Time</th>
                         <th className="px-6 py-4">Break Time</th>
@@ -1103,7 +1174,7 @@ export default function DashboardOverviewPage() {
                     <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
                       {filteredEmployees.length === 0 ? (
                         <tr>
-                          <td colSpan={9} className="px-6 py-14 text-center text-slate-400">
+                          <td colSpan={11} className="px-6 py-14 text-center text-slate-400">
                             <Users className="w-8 h-8 text-slate-300 mx-auto mb-2" />
                             No team members match the selected criteria.
                           </td>
@@ -1174,15 +1245,42 @@ export default function DashboardOverviewPage() {
                                       <Icon className="w-3.5 h-3.5 shrink-0" />
                                       <span className="truncate max-w-[170px]">{emp.currentApplication}</span>
                                     </div>
-                                    {emp.currentWebsite?.domain && (
+                                    {(emp.currentWebsite?.domain || emp.currentWebsiteDomain) && (
                                       <span className="inline-flex items-center gap-1 text-[11px] font-mono text-cyan-800 bg-cyan-50 px-2 py-0.5 rounded border border-cyan-200">
                                         <Globe className="w-3 h-3 text-cyan-700" />
-                                        {emp.currentWebsite.domain}
+                                        {emp.currentWebsite?.domain || emp.currentWebsiteDomain}
                                       </span>
                                     )}
                                   </div>
                                 ) : (
                                   <span className="text-slate-400">No active window</span>
+                                )}
+                              </td>
+                              {/* Start Work Timestamp */}
+                              <td className="px-6 py-4.5 font-mono text-xs whitespace-nowrap">
+                                {emp.todayShiftStartedAt ? (
+                                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 shadow-2xs">
+                                    <Clock className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                                    {formatTimeOnly(emp.todayShiftStartedAt)}
+                                  </span>
+                                ) : (
+                                  <span className="text-slate-400 font-medium">Not Started</span>
+                                )}
+                              </td>
+                              {/* End Work Timestamp */}
+                              <td className="px-6 py-4.5 font-mono text-xs whitespace-nowrap">
+                                {emp.todayShiftEndedAt ? (
+                                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-100 text-slate-700 border border-slate-200 shadow-2xs">
+                                    <CheckCircle2 className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                                    {formatTimeOnly(emp.todayShiftEndedAt)}
+                                  </span>
+                                ) : (emp.todayAttendanceStatus === 'PRESENT' || emp.currentStatus !== 'OFFLINE') && emp.todayShiftStartedAt ? (
+                                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-2xs">
+                                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                                    Working Now
+                                  </span>
+                                ) : (
+                                  <span className="text-slate-400 font-medium">—</span>
                                 )}
                               </td>
                               <td className="px-6 py-4.5 font-bold text-emerald-700 font-mono">
@@ -1255,16 +1353,45 @@ export default function DashboardOverviewPage() {
                               <Icon className="w-3.5 h-3.5" />
                               <span className="truncate max-w-[120px]">{emp.currentApplication}</span>
                             </div>
-                            {emp.currentWebsite?.domain && (
+                            {(emp.currentWebsite?.domain || emp.currentWebsiteDomain) && (
                               <span className="inline-flex items-center gap-1 text-[11px] font-mono text-cyan-800 bg-cyan-50 px-2 py-0.5 rounded border border-cyan-200">
                                 <Globe className="w-3 h-3 text-cyan-700" />
-                                {emp.currentWebsite.domain}
+                                {emp.currentWebsite?.domain || emp.currentWebsiteDomain}
                               </span>
                             )}
                           </div>
                         ) : (
                           <span className="text-xs text-slate-400">No active window</span>
                         )}
+                      </div>
+
+                      {/* Start Work & End Work Timings */}
+                      <div className="grid grid-cols-2 gap-2 text-xs pt-3 border-t border-slate-100">
+                        <div className="bg-slate-50/80 p-2.5 rounded-xl border border-slate-200/80">
+                          <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider flex items-center gap-1">
+                            <Clock className="w-3 h-3 text-emerald-600" /> Start Work
+                          </span>
+                          <span className="font-mono font-bold text-slate-900 text-xs mt-1 block">
+                            {emp.todayShiftStartedAt ? formatTimeOnly(emp.todayShiftStartedAt) : 'Not Started'}
+                          </span>
+                        </div>
+                        <div className="bg-slate-50/80 p-2.5 rounded-xl border border-slate-200/80">
+                          <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider flex items-center gap-1">
+                            <CheckCircle2 className="w-3 h-3 text-slate-500" /> End Work
+                          </span>
+                          <span className="font-mono font-bold text-slate-900 text-xs mt-1 block">
+                            {emp.todayShiftEndedAt ? (
+                              formatTimeOnly(emp.todayShiftEndedAt)
+                            ) : (emp.todayAttendanceStatus === 'PRESENT' || emp.currentStatus !== 'OFFLINE') && emp.todayShiftStartedAt ? (
+                              <span className="text-emerald-700 inline-flex items-center gap-1 font-bold">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                Working Now
+                              </span>
+                            ) : (
+                              '—'
+                            )}
+                          </span>
+                        </div>
                       </div>
 
                       {/* Productivity Ratio Bar */}
@@ -1299,6 +1426,366 @@ export default function DashboardOverviewPage() {
                 })}
               </div>
             )}
+          </div>
+        )}
+
+        {/* SECTION: ATTENDANCE & SHIFT LOGS */}
+        {dashboardTab === 'attendance' && (
+          <div className="space-y-6 animate-in fade-in duration-200">
+            {/* Top Attendance Controls & Date Selector */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white border border-slate-200/90 rounded-3xl p-5 sm:p-6 shadow-xs">
+              <div>
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-700">
+                    <CalendarCheck className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base sm:text-lg font-extrabold text-slate-900 tracking-tight">
+                      Daily Attendance Roster
+                    </h3>
+                    <p className="text-xs text-slate-500">
+                      Authoritative clock-in, clock-out, and daily work hours across your organization
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Date Selector & Today shortcut */}
+              <div className="flex items-center gap-2.5 self-start sm:self-auto">
+                <div className="relative flex items-center">
+                  <Calendar className="w-4 h-4 text-slate-400 absolute left-3 pointer-events-none" />
+                  <input
+                    type="date"
+                    value={attendanceDate}
+                    onChange={(e) => setAttendanceDate(e.target.value)}
+                    className="pl-9 pr-3.5 py-2 bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 shadow-2xs focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setAttendanceDate(new Date().toISOString().slice(0, 10))}
+                  className="px-3.5 py-2 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 shadow-2xs transition-colors"
+                >
+                  Today
+                </button>
+              </div>
+            </div>
+
+            {/* Attendance KPI Summary Cards */}
+            {attendanceSummary && (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-xs">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">
+                    Present Today
+                  </span>
+                  <div className="flex items-baseline gap-2 mt-2">
+                    <h4 className="text-2xl sm:text-3xl font-black text-emerald-600">
+                      {attendanceSummary.presentCount}
+                    </h4>
+                    <span className="text-xs font-semibold text-slate-500">
+                      / {attendanceSummary.totalEmployees} ({attendanceSummary.attendanceRate}%)
+                    </span>
+                  </div>
+                  <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 mt-2.5 inline-block">
+                    {attendanceSummary.attendanceRate}% Attendance Rate
+                  </span>
+                </div>
+
+                <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-xs">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">
+                    Currently Working Now
+                  </span>
+                  <div className="flex items-baseline gap-2 mt-2">
+                    <h4 className="text-2xl sm:text-3xl font-black text-slate-900">
+                      {attendanceSummary.workingNowCount}
+                    </h4>
+                    <span className="text-xs font-semibold text-slate-500">active sessions</span>
+                  </div>
+                  <span className="text-[11px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-200 mt-2.5 inline-flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
+                    On Workstations
+                  </span>
+                </div>
+
+                <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-xs">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">
+                    Completed Work (Clocked Out)
+                  </span>
+                  <div className="flex items-baseline gap-2 mt-2">
+                    <h4 className="text-2xl sm:text-3xl font-black text-slate-700">
+                      {attendanceSummary.completedShiftCount}
+                    </h4>
+                    <span className="text-xs font-semibold text-slate-500">ended work</span>
+                  </div>
+                  <span className="text-[11px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200 mt-2.5 inline-block">
+                    Clocked Out
+                  </span>
+                </div>
+
+                <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-xs">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">
+                    Absent / Not Marked
+                  </span>
+                  <div className="flex items-baseline gap-2 mt-2">
+                    <h4 className="text-2xl sm:text-3xl font-black text-rose-600">
+                      {attendanceSummary.absentCount}
+                    </h4>
+                    <span className="text-xs font-semibold text-slate-500">not clocked in</span>
+                  </div>
+                  <span className="text-[11px] font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200 mt-2.5 inline-block">
+                    No Attendance Logged
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* Attendance Filter and Search Bar */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white border border-slate-200/90 rounded-2xl p-4 shadow-xs">
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+                {[
+                  { label: 'All Team', value: 'ALL' },
+                  { label: 'Working Now', value: 'PRESENT_ACTIVE' },
+                  { label: 'Completed Work', value: 'SHIFT_COMPLETED' },
+                  { label: 'Absent', value: 'ABSENT' }
+                ].map((f) => (
+                  <button
+                    key={f.value}
+                    onClick={() => setAttendanceStatusFilter(f.value)}
+                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+                      attendanceStatusFilter === f.value
+                        ? 'bg-slate-900 text-white shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                    }`}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="relative w-full sm:w-64">
+                <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Filter by name or code..."
+                  value={attendanceSearchTerm}
+                  onChange={(e) => setAttendanceSearchTerm(e.target.value)}
+                  className="w-full pl-9 pr-3.5 py-2 bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 rounded-xl text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-500 font-medium transition-colors"
+                />
+              </div>
+            </div>
+
+            {/* Main Attendance Roster Table */}
+            <div className="bg-white border border-slate-200/90 rounded-3xl shadow-xs overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50/80 text-slate-500 font-bold uppercase tracking-wider border-b border-slate-200 text-[11px]">
+                    <tr>
+                      <th className="px-6 py-4">Employee</th>
+                      <th className="px-6 py-4">Attendance Status</th>
+                      <th className="px-6 py-4 text-emerald-800">Start Work (Clock In)</th>
+                      <th className="px-6 py-4 text-slate-800">End Work (Clock Out)</th>
+                      <th className="px-6 py-4">Total Work Time</th>
+                      <th className="px-6 py-4">Active Work</th>
+                      <th className="px-6 py-4">Idle / Away</th>
+                      <th className="px-6 py-4">Break Time</th>
+                      <th className="px-6 py-4">Work Sessions</th>
+                      <th className="px-6 py-4 text-right">Profile</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+                    {isAttendanceLoading ? (
+                      <tr>
+                        <td colSpan={10} className="px-6 py-14 text-center text-slate-400">
+                          <div className="flex flex-col items-center gap-2">
+                            <div className="w-6 h-6 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+                            <span>Loading attendance records for {attendanceDate}...</span>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : attendanceRoster.filter((item) => {
+                        const q = attendanceSearchTerm.toLowerCase();
+                        const matchesSearch =
+                          item.name.toLowerCase().includes(q) ||
+                          item.email.toLowerCase().includes(q) ||
+                          (item.employeeCode || '').toLowerCase().includes(q);
+                        const matchesStatus =
+                          attendanceStatusFilter === 'ALL' || item.attendanceStatus === attendanceStatusFilter;
+                        return matchesSearch && matchesStatus;
+                      }).length === 0 ? (
+                      <tr>
+                        <td colSpan={10} className="px-6 py-14 text-center text-slate-400">
+                          <CalendarCheck className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                          No attendance records found matching this criteria for {attendanceDate}.
+                        </td>
+                      </tr>
+                    ) : (
+                      attendanceRoster
+                        .filter((item) => {
+                          const q = attendanceSearchTerm.toLowerCase();
+                          const matchesSearch =
+                            item.name.toLowerCase().includes(q) ||
+                            item.email.toLowerCase().includes(q) ||
+                            (item.employeeCode || '').toLowerCase().includes(q);
+                          const matchesStatus =
+                            attendanceStatusFilter === 'ALL' || item.attendanceStatus === attendanceStatusFilter;
+                          return matchesSearch && matchesStatus;
+                        })
+                        .map((att) => {
+                          const isExpanded = !!expandedAttendanceSessions[att.employeeId];
+                          return (
+                            <React.Fragment key={att.employeeId}>
+                              <tr className="hover:bg-slate-50/80 transition-colors group">
+                                <td className="px-6 py-4.5">
+                                  <div className="flex items-center gap-3">
+                                    <div className="w-9 h-9 rounded-xl bg-slate-900 text-white font-extrabold flex items-center justify-center text-xs shrink-0 ring-1 ring-slate-200">
+                                      {att.name.charAt(0)}
+                                    </div>
+                                    <div>
+                                      <p className="font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">
+                                        {att.name}
+                                      </p>
+                                      <p className="text-[11px] text-slate-500">
+                                        {att.employeeCode} • {att.department || 'Operations'}
+                                      </p>
+                                    </div>
+                                  </div>
+                                </td>
+
+                                <td className="px-6 py-4.5 whitespace-nowrap">
+                                  {att.attendanceStatus === 'PRESENT_ACTIVE' ? (
+                                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold bg-emerald-50 text-emerald-800 border border-emerald-300 shadow-2xs">
+                                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                                      Working Now
+                                    </span>
+                                  ) : att.attendanceStatus === 'SHIFT_COMPLETED' ? (
+                                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-800 border border-slate-200 shadow-2xs">
+                                      <Check className="w-3.5 h-3.5 text-slate-600" />
+                                      Completed Work
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-rose-50 text-rose-800 border border-rose-200 shadow-2xs">
+                                      <X className="w-3.5 h-3.5 text-rose-500" />
+                                      Absent / Not Clocked
+                                    </span>
+                                  )}
+                                </td>
+
+                                {/* Start Work (Clock In) */}
+                                <td className="px-6 py-4.5 font-mono text-xs whitespace-nowrap">
+                                  {att.shiftStartedAt ? (
+                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 shadow-2xs">
+                                      <Clock className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                                      {formatTimeOnly(att.shiftStartedAt)}
+                                    </span>
+                                  ) : (
+                                    <span className="text-slate-400 font-medium">Not Started</span>
+                                  )}
+                                </td>
+
+                                {/* End Work (Clock Out) */}
+                                <td className="px-6 py-4.5 font-mono text-xs whitespace-nowrap">
+                                  {att.shiftEndedAt ? (
+                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-100 text-slate-700 border border-slate-200 shadow-2xs">
+                                      <CheckCircle2 className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                                      {formatTimeOnly(att.shiftEndedAt)}
+                                    </span>
+                                  ) : att.shiftStartedAt ? (
+                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-2xs">
+                                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                                      Working Now
+                                    </span>
+                                  ) : (
+                                    <span className="text-slate-400 font-medium">—</span>
+                                  )}
+                                </td>
+
+                                <td className="px-6 py-4.5 font-bold text-slate-900 font-mono">
+                                  {formatDuration(att.totalShiftSeconds)}
+                                </td>
+                                <td className="px-6 py-4.5 font-bold text-emerald-700 font-mono">
+                                  {formatDuration(att.totalActiveSeconds)}
+                                </td>
+                                <td className="px-6 py-4.5 text-amber-700 font-semibold font-mono">
+                                  {formatDuration(att.totalIdleSeconds)}
+                                </td>
+                                <td className="px-6 py-4.5 text-sky-700 font-semibold font-mono">
+                                  {formatDuration(att.totalBreakSeconds)}
+                                </td>
+
+                                {/* Work Sessions Count & Expand Trigger */}
+                                <td className="px-6 py-4.5 whitespace-nowrap">
+                                  {att.sessionsCount > 0 ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => toggleAttendanceExpand(att.employeeId)}
+                                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-colors"
+                                      title="Toggle session details"
+                                    >
+                                      <span>{att.sessionsCount} {att.sessionsCount === 1 ? 'session' : 'sessions'}</span>
+                                      {isExpanded ? (
+                                        <ChevronUp className="w-3.5 h-3.5 text-slate-500" />
+                                      ) : (
+                                        <ChevronDown className="w-3.5 h-3.5 text-slate-500" />
+                                      )}
+                                    </button>
+                                  ) : (
+                                    <span className="text-slate-400 font-medium">—</span>
+                                  )}
+                                </td>
+
+                                <td className="px-6 py-4.5 text-right whitespace-nowrap">
+                                  <Link
+                                    to={`/dashboard/employees/${att.employeeId}`}
+                                    className="inline-flex items-center gap-1.5 text-xs font-bold text-indigo-600 hover:text-indigo-700 bg-indigo-50/80 hover:bg-indigo-100 border border-indigo-200/80 px-3 py-1.5 rounded-xl transition-all shadow-2xs"
+                                  >
+                                    View <ArrowUpRight className="w-3.5 h-3.5" />
+                                  </Link>
+                                </td>
+                              </tr>
+
+                              {/* Expandable Sessions Drawer */}
+                              {isExpanded && att.sessions && att.sessions.length > 0 && (
+                                <tr className="bg-slate-50/80">
+                                  <td colSpan={10} className="px-8 py-3.5 border-y border-slate-200">
+                                    <div className="space-y-2">
+                                      <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                                        Work Sessions for {att.name} on {attendanceDate}:
+                                      </p>
+                                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
+                                        {att.sessions.map((sess: any, sIdx: number) => (
+                                          <div
+                                            key={sess._id || sIdx}
+                                            className="p-3 bg-white rounded-xl border border-slate-200 shadow-2xs text-xs space-y-1"
+                                          >
+                                            <div className="flex items-center justify-between font-bold">
+                                              <span className="text-slate-800">Session #{sIdx + 1}</span>
+                                              <span className="text-emerald-700 font-mono">
+                                                {formatDuration(sess.durationSeconds || 0)}
+                                              </span>
+                                            </div>
+                                            <div className="flex items-center justify-between text-[11px] text-slate-500 font-mono">
+                                              <span>Start: {formatTimeOnly(sess.startedAt) || '—'}</span>
+                                              <span>
+                                                End: {sess.endedAt ? formatTimeOnly(sess.endedAt) : (
+                                                  <span className="text-emerald-600 font-bold">In Progress</span>
+                                                )}
+                                              </span>
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  </td>
+                                </tr>
+                              )}
+                            </React.Fragment>
+                          );
+                        })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         )}
 

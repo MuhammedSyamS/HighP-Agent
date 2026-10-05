@@ -5,7 +5,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../lib/authContext';
 import { api } from '../../lib/api';
 import { getSocket } from '../../lib/socket';
-import { formatDuration, getLocalDateString } from '../../lib/utils';
+import { formatDuration, formatDurationExact, getLocalDateString } from '../../lib/utils';
 import { StatusBadge } from '../../components/StatusBadge';
 import { TimelineVisualizer } from '../../components/TimelineVisualizer';
 import {
@@ -26,7 +26,12 @@ import {
   Download,
   Check,
   AlertCircle,
-  X
+  X,
+  Globe,
+  Calendar,
+  List,
+  Layers,
+  History
 } from 'lucide-react';
 import { ActivityState, BreakReason } from '@highp/shared';
 import { getDesktopAgentDownloadUrl } from '../../lib/constants';
@@ -36,11 +41,18 @@ export default function EmployeeWorkspacePage() {
   const { user, profile, company, refreshAuth, logout, isLoading } = useAuth();
   const [mounted, setMounted] = useState(false);
   const [currentProfile, setCurrentProfile] = useState<any>(profile);
+  const [currentSession, setCurrentSession] = useState<any>(null);
+  const [completedSessions, setCompletedSessions] = useState<any[]>([]);
+  const [lastCompletedSession, setLastCompletedSession] = useState<any>(null);
+  const [todayTotals, setTodayTotals] = useState<any>(null);
   const [timelineEvents, setTimelineEvents] = useState<any[]>([]);
   const [appUsages, setAppUsages] = useState<any[]>([]);
+  const [websiteUsages, setWebsiteUsages] = useState<any[]>([]);
+  const [selectedDate, setSelectedDate] = useState<string>(() => getLocalDateString());
   const [loading, setLoading] = useState(false);
   const [actionError, setActionError] = useState<string>('');
   const [breakReason, setBreakReason] = useState<string>(BreakReason.LUNCH);
+  const [activityViewTab, setActivityViewTab] = useState<'timeline' | 'logs'>('timeline');
 
   const [showInstallBanner, setShowInstallBanner] = useState(true);
   const [autoDownloaded, setAutoDownloaded] = useState(false);
@@ -103,14 +115,20 @@ export default function EmployeeWorkspacePage() {
   const [currentAppFocus, setCurrentAppFocus] = useState('Active Workstation');
   const lastActivityRef = React.useRef(Date.now());
 
-  // Save live counters to localStorage so page refresh never wipes today's tracked time
+  // Save live counters to localStorage only while actively working
   useEffect(() => {
     try {
-      const today = new Date().toISOString().slice(0, 10);
-      localStorage.setItem('highp_live_date', today);
-      if (liveActiveSeconds > 0) localStorage.setItem('highp_live_active_sec', String(liveActiveSeconds));
-      if (liveIdleSeconds > 0) localStorage.setItem('highp_live_idle_sec', String(liveIdleSeconds));
-      if (liveBreakSeconds > 0) localStorage.setItem('highp_live_break_sec', String(liveBreakSeconds));
+      if (isWorkingRef.current) {
+        const today = new Date().toISOString().slice(0, 10);
+        localStorage.setItem('highp_live_date', today);
+        localStorage.setItem('highp_live_active_sec', String(liveActiveSeconds));
+        localStorage.setItem('highp_live_idle_sec', String(liveIdleSeconds));
+        localStorage.setItem('highp_live_break_sec', String(liveBreakSeconds));
+      } else {
+        localStorage.removeItem('highp_live_active_sec');
+        localStorage.removeItem('highp_live_idle_sec');
+        localStorage.removeItem('highp_live_break_sec');
+      }
     } catch {}
   }, [liveActiveSeconds, liveIdleSeconds, liveBreakSeconds]);
 
@@ -148,18 +166,26 @@ export default function EmployeeWorkspacePage() {
     if (!empId) return;
     try {
       const today = getLocalDateString();
-      const [empRes, timelineRes, appRes, liveRes] = await Promise.all([
+      const queryDate = selectedDate || today;
+      const [empRes, timelineRes, appRes, webRes, liveRes] = await Promise.all([
         api.get(`/employees/${empId}`),
-        api.get(`/activity/${empId}/timeline?date=${today}`),
-        api.get(`/applications/usage/${empId}?date=${today}`),
+        api.get(`/activity/${empId}/timeline?date=${queryDate}`),
+        api.get(`/applications/usage/${empId}?date=${queryDate}`),
+        api.get(`/applications/websites/${empId}?date=${queryDate}`).catch(() => null),
         api.get(`/employees/${empId}/live`).catch(() => null)
       ]);
 
-      if (empRes.data?.data?.profile) {
-        const p = empRes.data.data.profile;
-        setCurrentProfile(p);
+      if (empRes.data?.data) {
+        const d = empRes.data.data;
+        const p = d.profile;
+        if (p) setCurrentProfile(p);
 
-        const currentSess = empRes.data?.data?.currentSession;
+        const currentSess = d.currentSession && d.currentSession.status === 'ACTIVE' ? d.currentSession : null;
+        setCurrentSession(currentSess);
+        setCompletedSessions(d.completedSessions || []);
+        setLastCompletedSession(d.lastCompletedSession || null);
+        setTodayTotals(d.todayTotals || null);
+
         let sessActive = 0;
         let sessIdle = 0;
         let sessBreak = 0;
@@ -169,14 +195,29 @@ export default function EmployeeWorkspacePage() {
           sessBreak = currentSess.breakSeconds || 0;
         }
 
-        const authoritativeActive = Math.max(p.todayActiveSeconds || 0, sessActive);
-        const authoritativeIdle = Math.max(p.todayIdleSeconds || 0, sessIdle);
-        const authoritativeBreak = Math.max(p.todayBreakSeconds || 0, sessBreak);
+        const isCurrentlyWorking = !!currentSess && p?.currentStatus !== ActivityState.OFFLINE;
 
-        setLiveActiveSeconds(authoritativeActive);
-        setLiveIdleSeconds(authoritativeIdle);
-        setLiveBreakSeconds(authoritativeBreak);
-        if (p.currentApplication) setCurrentAppFocus(p.currentApplication);
+        if (isCurrentlyWorking) {
+          // Sync with the active work session (starts clean from 0 for every shift!)
+          setLiveActiveSeconds(sessActive);
+          setLiveIdleSeconds(sessIdle);
+          setLiveBreakSeconds(sessBreak);
+        } else {
+          // Off shift: reset live shift counters so user is ready for new shift
+          setLiveActiveSeconds(0);
+          setLiveIdleSeconds(0);
+          setLiveBreakSeconds(0);
+          try {
+            localStorage.removeItem('highp_live_active_sec');
+            localStorage.removeItem('highp_live_idle_sec');
+            localStorage.removeItem('highp_live_break_sec');
+          } catch {}
+        }
+        if (p?.currentApplication && isCurrentlyWorking) {
+          setCurrentAppFocus(p.currentApplication);
+        } else if (!isCurrentlyWorking) {
+          setCurrentAppFocus('Shift Inactive');
+        }
       }
       if (liveRes?.data?.data) {
         const live = liveRes.data.data;
@@ -184,12 +225,34 @@ export default function EmployeeWorkspacePage() {
           setCurrentAppFocus(live.application);
         }
       }
-      if (timelineRes.data?.data?.events) setTimelineEvents(timelineRes.data.data.events);
-      if (appRes.data?.data?.applications) setAppUsages(appRes.data.data.applications);
+
+      let events = timelineRes.data?.data?.events || [];
+      // If selected date has 0 events and it's today, check yesterday's events so overnight/late-night workers see their shift
+      if (events.length === 0 && queryDate === today) {
+        try {
+          const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+          const yRes = await api.get(`/activity/${empId}/timeline?date=${yesterday}`);
+          if (yRes.data?.data?.events?.length > 0) {
+            events = yRes.data.data.events;
+          }
+        } catch {}
+      }
+      setTimelineEvents(events);
+
+      let apps = appRes.data?.data?.applications || [];
+      if (apps.length === 0 && queryDate === today && empRes.data?.data?.topApps?.length > 0) {
+        apps = empRes.data.data.topApps;
+      }
+      setAppUsages(apps);
+
+      const sites = (webRes?.data?.data?.websites && webRes.data.data.websites.length > 0)
+        ? webRes.data.data.websites
+        : (empRes.data?.data?.topWebsites || []);
+      setWebsiteUsages(sites);
     } catch (err) {
       console.error('[Employee] Fetch error:', err);
     }
-  }, [profile?._id, currentProfile?._id, user?.employeeProfileId]);
+  }, [profile?._id, user?.employeeProfileId, selectedDate]);
 
   useEffect(() => {
     const empId = profile?._id || currentProfile?._id || user?.employeeProfileId;
@@ -218,13 +281,58 @@ export default function EmployeeWorkspacePage() {
 
         const handleStatusChanged = (data: any) => {
           if (data && (data.employeeProfileId === empId || data.employeeId === empId)) {
+            if (data.status === 'OFFLINE' || data.status === 'offline') {
+              isWorkingRef.current = false;
+              isOnBreakRef.current = false;
+              setIsIdle(false);
+              setCurrentSession(null);
+              setLiveActiveSeconds(0);
+              setLiveIdleSeconds(0);
+              setLiveBreakSeconds(0);
+              setCurrentAppFocus('Shift Inactive');
+              setCurrentProfile((prev: any) => ({
+                ...prev,
+                currentStatus: ActivityState.OFFLINE,
+                currentSessionId: undefined,
+                currentApplication: '',
+                todayActiveSeconds: data.todayActiveSeconds ?? prev?.todayActiveSeconds,
+                todayIdleSeconds: data.todayIdleSeconds ?? prev?.todayIdleSeconds,
+                todayBreakSeconds: data.todayBreakSeconds ?? prev?.todayBreakSeconds,
+                todayAttendanceStatus: 'COMPLETED'
+              }));
+              fetchMyData();
+              return;
+            }
+
             setCurrentProfile((prev: any) => ({
               ...prev,
               currentStatus: data.status,
-              currentApplication: data.currentApplication !== undefined ? data.currentApplication : prev?.currentApplication
+              currentApplication: data.currentApplication !== undefined ? data.currentApplication : prev?.currentApplication,
+              currentWebsiteDomain: data.currentWebsite?.domain !== undefined ? data.currentWebsite.domain : prev?.currentWebsiteDomain,
+              todayActiveSeconds: data.todayActiveSeconds ?? prev?.todayActiveSeconds,
+              todayIdleSeconds: data.todayIdleSeconds ?? prev?.todayIdleSeconds,
+              todayBreakSeconds: data.todayBreakSeconds ?? prev?.todayBreakSeconds
             }));
-            if (data.status === 'ACTIVE' && data.currentApplication) {
-              setCurrentAppFocus(data.currentApplication);
+
+            if (data.currentSessionActiveSeconds != null) {
+              setLiveActiveSeconds(data.currentSessionActiveSeconds);
+            }
+            if (data.currentSessionIdleSeconds != null) {
+              setLiveIdleSeconds(data.currentSessionIdleSeconds);
+            }
+
+            if (data.status === 'IDLE' || data.status === 'idle') {
+              setIsIdle(true);
+              isIdleRef.current = true;
+              setCurrentAppFocus('System Idle');
+            } else if (data.status === 'ACTIVE' || data.status === 'active') {
+              setIsIdle(false);
+              isIdleRef.current = false;
+              if (data.currentApplication) {
+                setCurrentAppFocus(data.currentApplication);
+              }
+            } else if (data.status === 'BREAK' || data.status === 'break') {
+              setCurrentAppFocus('On Break');
             }
           }
         };
@@ -237,23 +345,35 @@ export default function EmployeeWorkspacePage() {
           }
         };
 
+        const handleSessionEnded = (data: any) => {
+          if (data && (data.employeeProfileId === empId || data.employeeId === empId)) {
+            setCurrentSession(null);
+            fetchMyData();
+          }
+        };
+
         socket.on('employee:telemetry_updated', handleTelemetryUpdated);
         socket.on('employee:status_changed', handleStatusChanged);
         socket.on('employee:activity_changed', handleActivityChanged);
+        socket.on('employee:session_ended', handleSessionEnded);
 
         return () => {
           clearInterval(interval);
           socket.off('employee:telemetry_updated', handleTelemetryUpdated);
           socket.off('employee:status_changed', handleStatusChanged);
           socket.off('employee:activity_changed', handleActivityChanged);
+          socket.off('employee:session_ended', handleSessionEnded);
         };
       }
 
       return () => clearInterval(interval);
     }
-  }, [profile?._id, currentProfile?._id, user?.employeeProfileId, fetchMyData]);
+  }, [profile?._id, user?.employeeProfileId, selectedDate]);
 
-  const isWorking = !!currentProfile?.currentSessionId;
+  const isWorking = Boolean(
+    (currentSession && currentSession.status === 'ACTIVE' && currentProfile?.currentStatus !== ActivityState.OFFLINE) ||
+    (currentProfile?.currentSessionId && currentProfile?.currentStatus && currentProfile.currentStatus !== ActivityState.OFFLINE)
+  );
   const isOnBreak = currentProfile?.currentStatus === ActivityState.BREAK;
   const todayStr = getLocalDateString();
 
@@ -297,14 +417,15 @@ export default function EmployeeWorkspacePage() {
     isIdleRef.current = isIdle;
   }, [isIdle]);
 
-  // 1-Second Live Local Ticker
+  // 1-Second Live Local Ticker with strict mutual exclusion
   useEffect(() => {
     if (!isWorking) return;
 
     const ticker = setInterval(() => {
-      // 5-minute inactivity threshold
+      // 1-minute (60-second) inactivity threshold
       const idleMs = Date.now() - lastActivityRef.current;
-      const nowIdle = idleMs > 5 * 60 * 1000;
+      const isDesktopIdle = currentProfile?.currentStatus === 'IDLE';
+      const nowIdle = isIdleRef.current || isDesktopIdle || (idleMs > 60 * 1000);
       if (nowIdle !== isIdleRef.current) {
         isIdleRef.current = nowIdle;
         setIsIdle(nowIdle);
@@ -320,7 +441,7 @@ export default function EmployeeWorkspacePage() {
     }, 1000);
 
     return () => clearInterval(ticker);
-  }, [isWorking]);
+  }, [isWorking, currentProfile?.currentStatus]);
 
 const getBrowserAppName = (): string => {
   if (typeof window === 'undefined') return '';
@@ -357,7 +478,7 @@ const getBrowserAppName = (): string => {
         await api.post('/attendance/heartbeat', {
           status: effectiveStatus,
           ...(!isDesktopLinked && browserApp ? { currentApplication: browserApp } : {}),
-          recentDurationSeconds: durationSec,
+          recentDurationSeconds: isDesktopLinked ? 0 : durationSec,
           idleSeconds: idleTimeSeconds
         });
       } catch (err) {
@@ -392,13 +513,25 @@ const getBrowserAppName = (): string => {
   const handleStartWork = async () => {
     setActionError('');
     setLoading(true);
-    // Optimistic UI update
+    // Optimistic UI update - start fresh at 0 for this new shift!
     const browserApp = getBrowserAppName();
+    const nowIso = new Date().toISOString();
+    setLiveActiveSeconds(0);
+    setLiveIdleSeconds(0);
+    setLiveBreakSeconds(0);
+    try {
+      localStorage.removeItem('highp_live_active_sec');
+      localStorage.removeItem('highp_live_idle_sec');
+      localStorage.removeItem('highp_live_break_sec');
+    } catch {}
     setCurrentProfile((prev: any) => ({
       ...prev,
       currentStatus: ActivityState.ACTIVE,
       currentApplication: browserApp,
-      currentSessionId: prev?.currentSessionId || 'session-optimistic'
+      currentSessionId: prev?.currentSessionId || 'session-optimistic',
+      todayShiftStartedAt: prev?.todayShiftStartedAt || nowIso,
+      todayShiftEndedAt: null,
+      todayAttendanceStatus: 'PRESENT'
     }));
     isWorkingRef.current = true;
     isOnBreakRef.current = false;
@@ -407,12 +540,18 @@ const getBrowserAppName = (): string => {
 
     try {
       const startRes = await api.post('/attendance/start', {});
-      if (startRes.data?.data) {
+      const newSess = startRes.data?.data;
+      if (newSess) {
+        setCurrentSession(newSess);
         setCurrentProfile((prev: any) => ({
           ...prev,
-          currentSessionId: startRes.data.data._id,
+          currentSessionId: newSess._id,
           currentStatus: ActivityState.ACTIVE,
-          currentApplication: browserApp
+          currentApplication: browserApp,
+          currentShiftStartedAt: newSess.startedAt || nowIso,
+          todayShiftStartedAt: prev?.todayShiftStartedAt || newSess.startedAt || nowIso,
+          todayShiftEndedAt: null,
+          todayAttendanceStatus: 'PRESENT'
         }));
       }
       await api.post('/attendance/heartbeat', {
@@ -437,15 +576,28 @@ const getBrowserAppName = (): string => {
     if (!confirm('Are you sure you want to end your work session?')) return;
     setActionError('');
     setLoading(true);
-    // Optimistic UI update
+
+    isWorkingRef.current = false;
+    isOnBreakRef.current = false;
+    setIsIdle(false);
+
+    setCurrentSession(null);
     setCurrentProfile((prev: any) => ({
       ...prev,
       currentStatus: ActivityState.OFFLINE,
       currentSessionId: undefined,
-      currentApplication: ''
+      currentApplication: '',
+      todayAttendanceStatus: 'COMPLETED'
     }));
-    isWorkingRef.current = false;
-    isOnBreakRef.current = false;
+
+    setLiveActiveSeconds(0);
+    setLiveIdleSeconds(0);
+    setLiveBreakSeconds(0);
+    try {
+      localStorage.removeItem('highp_live_active_sec');
+      localStorage.removeItem('highp_live_idle_sec');
+      localStorage.removeItem('highp_live_break_sec');
+    } catch {}
 
     try {
       await sendHeartbeat(ActivityState.OFFLINE, 1);
@@ -681,13 +833,18 @@ const getBrowserAppName = (): string => {
                   ) : (
                     <span className="text-emerald-600 flex items-center gap-3">
                       <span className="w-3.5 h-3.5 rounded-full bg-emerald-500 animate-ping"></span>
-                      Active Work Shift
+                      Working Now
                     </span>
                   )
+                ) : completedSessions.length > 0 ? (
+                  <span className="text-slate-600 flex items-center gap-3">
+                    <span className="w-3.5 h-3.5 rounded-full bg-indigo-500"></span>
+                    Clocked Out
+                  </span>
                 ) : (
                   <span className="text-slate-400 flex items-center gap-3">
                     <span className="w-3 h-3 rounded-full bg-slate-300"></span>
-                    Shift Not Started
+                    Not Clocked In
                   </span>
                 )}
               </h2>
@@ -697,7 +854,9 @@ const getBrowserAppName = (): string => {
                   ? isOnBreak
                     ? 'You are on break. Click "Resume Work" when you return to your workstation.'
                     : 'Your session is recording active software time, idle intervals, and productivity metrics.'
-                  : 'Start your work shift below to begin recording attendance.'}
+                  : completedSessions.length > 0
+                  ? 'Your work session has ended. Click Start Work below to begin a new session.'
+                  : 'Click Start Work below to begin recording your work session and attendance.'}
               </p>
             </div>
 
@@ -710,7 +869,7 @@ const getBrowserAppName = (): string => {
                   className="w-full sm:w-auto justify-center flex items-center gap-2.5 px-8 py-4 rounded-2xl bg-black hover:bg-slate-800 text-white font-black text-sm shadow-md transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
                 >
                   <Play className="w-5 h-5 fill-current text-white" />
-                  <span>Start Work Shift</span>
+                  <span>Start Work</span>
                 </button>
               ) : (
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
@@ -742,7 +901,7 @@ const getBrowserAppName = (): string => {
                       className="w-full sm:w-auto justify-center flex items-center gap-2 px-6 py-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md shadow-indigo-600/20 transition-all active:scale-95"
                     >
                       <Play className="w-4 h-4 fill-current" />
-                      <span>Resume Work Shift</span>
+                      <span>Resume Work</span>
                     </button>
                   )}
 
@@ -759,17 +918,149 @@ const getBrowserAppName = (): string => {
             </div>
           </div>
 
-          {/* Metric Grid with generous breathing room */}
+          {/* Daily Attendance Marking & Session Timings Banner */}
+          <div className="mt-8 pt-6 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-50/70 p-4.5 sm:p-5 rounded-2xl border border-slate-200/80 relative z-10">
+            <div className="flex items-center gap-3">
+              <div
+                className={`w-10 h-10 rounded-xl border flex items-center justify-center text-xs font-bold shrink-0 ${
+                  isWorking
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-300 shadow-2xs'
+                    : completedSessions.length > 0
+                    ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                    : 'bg-slate-100 text-slate-400 border-slate-200'
+                }`}
+              >
+                <Clock className="w-5 h-5" />
+              </div>
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                  Daily Attendance Log
+                </span>
+                <span className="text-xs sm:text-sm font-extrabold text-slate-900 mt-0.5 block">
+                  {isWorking ? (
+                    <span className="inline-flex items-center gap-1.5 text-emerald-700">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                      Present • Working Now
+                    </span>
+                  ) : completedSessions.length > 0 ? (
+                    <span className="inline-flex items-center gap-1.5 text-slate-700">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                      Work Concluded (Clocked Out)
+                    </span>
+                  ) : (
+                    <span className="text-slate-500">Not Clocked In Today</span>
+                  )}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-4 sm:gap-7 text-xs flex-wrap sm:flex-nowrap">
+              <div className="bg-white px-3.5 py-2 rounded-xl border border-slate-200 shadow-2xs">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                  {isWorking ? 'Start Work (Current Session)' : lastCompletedSession ? 'Start Work (Last Session)' : 'Start Work (Clock In)'}
+                </span>
+                <span className="font-mono font-bold text-slate-800 text-xs sm:text-sm mt-0.5 block">
+                  {isWorking && currentSession?.startedAt ? (
+                    new Date(currentSession.startedAt).toLocaleTimeString([], {
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })
+                  ) : !isWorking && lastCompletedSession?.startedAt ? (
+                    new Date(lastCompletedSession.startedAt).toLocaleTimeString([], {
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })
+                  ) : isWorking ? (
+                    'Marking now...'
+                  ) : (
+                    '—'
+                  )}
+                </span>
+              </div>
+
+              <div className="bg-white px-3.5 py-2 rounded-xl border border-slate-200 shadow-2xs">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                  {isWorking ? 'Current Status' : 'End Work (Clock Out)'}
+                </span>
+                <span className="font-mono font-bold text-slate-800 text-xs sm:text-sm mt-0.5 block">
+                  {isWorking ? (
+                    <span className="inline-flex items-center gap-1.5 font-bold">
+                      <span className={`w-1.5 h-1.5 rounded-full ${isOnBreak ? 'bg-indigo-500' : isIdle || currentProfile?.currentStatus === 'IDLE' ? 'bg-amber-500' : 'bg-emerald-500 animate-pulse'}`} />
+                      <span className={isOnBreak ? 'text-indigo-700' : isIdle || currentProfile?.currentStatus === 'IDLE' ? 'text-amber-700' : 'text-emerald-700'}>
+                        {isOnBreak ? 'On Break' : isIdle || currentProfile?.currentStatus === 'IDLE' ? 'Workstation Idle' : 'Working Now'}
+                      </span>
+                    </span>
+                  ) : !isWorking && lastCompletedSession?.endedAt ? (
+                    new Date(lastCompletedSession.endedAt).toLocaleTimeString([], {
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })
+                  ) : (
+                    '—'
+                  )}
+                </span>
+              </div>
+
+              <div className="bg-white px-3.5 py-2 rounded-xl border border-slate-200 shadow-2xs">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                  {isWorking ? 'Current Session Duration' : lastCompletedSession ? 'Last Session Duration' : 'Total Work Duration'}
+                </span>
+                <span className="font-mono font-bold text-indigo-700 text-xs sm:text-sm mt-0.5 block">
+                  {(() => {
+                    if (isWorking) {
+                      const startTime = currentSession?.startedAt || currentProfile?.currentShiftStartedAt;
+                      if (startTime) {
+                        const elapsedSec = Math.max(0, Math.round((Date.now() - new Date(startTime).getTime()) / 1000));
+                        return formatDuration(elapsedSec);
+                      }
+                      return formatDuration(liveActiveSeconds + liveIdleSeconds + liveBreakSeconds);
+                    }
+                    if (lastCompletedSession && lastCompletedSession.durationSeconds != null) {
+                      return formatDuration(lastCompletedSession.durationSeconds);
+                    }
+                    if (completedSessions.length > 0) {
+                      const last = completedSessions[completedSessions.length - 1];
+                      if (last.durationSeconds != null) return formatDuration(last.durationSeconds);
+                      if (last.endedAt && last.startedAt) {
+                        return formatDuration(Math.max(0, Math.round((new Date(last.endedAt).getTime() - new Date(last.startedAt).getTime()) / 1000)));
+                      }
+                    }
+                    return '0m';
+                  })()}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Active Software / Website Focus Indicator */}
+          {isWorking && (
+            <div className="mt-4 flex items-center justify-between gap-3 bg-indigo-50/70 border border-indigo-100/90 px-4 py-2.5 rounded-xl text-xs flex-wrap">
+              <div className="flex items-center gap-2">
+                <Monitor className="w-4 h-4 text-indigo-600 shrink-0" />
+                <span className="font-bold text-slate-500 uppercase tracking-wider text-[10px]">Active Focus:</span>
+                <span className="font-bold text-slate-900">{isOnBreak ? 'On Break' : isIdle ? 'Idle / Inactive' : currentAppFocus}</span>
+              </div>
+              {(currentProfile?.currentWebsiteDomain || currentProfile?.currentWebsite?.domain) && !isIdle && !isOnBreak && (
+                <span className="inline-flex items-center gap-1.5 text-[11px] font-mono text-cyan-800 bg-cyan-50 px-2.5 py-0.5 rounded-lg border border-cyan-200">
+                  <Globe className="w-3.5 h-3.5 text-cyan-600 shrink-0" />
+                  {currentProfile?.currentWebsiteDomain || currentProfile?.currentWebsite?.domain}
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* Metric Grid: Today's Cumulative Totals */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6 mt-9 pt-7 border-t border-slate-100 text-center relative z-10">
             <div className="bg-slate-50/80 p-5 rounded-2xl border border-slate-200/80 shadow-2xs transition-all hover:bg-slate-50">
               <span className="text-[11px] font-bold text-slate-500 block uppercase tracking-wider">
                 Active Work Today
               </span>
               <span className="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-2 block tracking-tight font-sans">
-                {formatDuration(liveActiveSeconds)}
+                {formatDuration((todayTotals?.todayActiveSeconds ?? currentProfile?.todayActiveSeconds) || 0)}
               </span>
               <span className="text-[11px] font-semibold text-emerald-700 mt-1 inline-flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Productive focus
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                {isWorking ? 'Current session: ' + formatDurationExact(liveActiveSeconds) : 'All sessions saved'}
               </span>
             </div>
 
@@ -778,10 +1069,11 @@ const getBrowserAppName = (): string => {
                 Idle Inactivity
               </span>
               <span className="text-2xl sm:text-3xl font-extrabold text-amber-600 mt-2 block tracking-tight font-sans">
-                {formatDuration(liveIdleSeconds)}
+                {formatDuration((todayTotals?.todayIdleSeconds ?? currentProfile?.todayIdleSeconds) || 0)}
               </span>
               <span className="text-[11px] font-semibold text-amber-700 mt-1 inline-flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-amber-500" /> Away from desk
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                {isWorking ? 'Current session: ' + formatDurationExact(liveIdleSeconds) : 'Away from desk'}
               </span>
             </div>
 
@@ -790,40 +1082,402 @@ const getBrowserAppName = (): string => {
                 Total Breaks
               </span>
               <span className="text-2xl sm:text-3xl font-extrabold text-indigo-600 mt-2 block tracking-tight font-sans">
-                {formatDuration(liveBreakSeconds)}
+                {formatDuration((todayTotals?.todayBreakSeconds ?? currentProfile?.todayBreakSeconds) || 0)}
               </span>
               <span className="text-[11px] font-semibold text-indigo-700 mt-1 inline-flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" /> Logged breaks
+                <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+                {isWorking ? 'Current session: ' + formatDurationExact(liveBreakSeconds) : 'Logged breaks'}
               </span>
             </div>
 
             <div className="bg-slate-50/80 p-5 rounded-2xl border border-slate-200/80 shadow-2xs transition-all hover:bg-slate-50">
               <span className="text-[11px] font-bold text-slate-500 block uppercase tracking-wider">
-                Current Software Focus
+                Today's Total Work Time
               </span>
-              <span className="text-sm sm:text-base font-bold text-slate-900 mt-2 block truncate">
-                {!isWorking
-                  ? 'Shift Inactive'
-                  : isOnBreak
-                  ? 'On Break'
-                  : isIdle
-                  ? 'Idle / Inactive'
-                  : currentAppFocus}
+              <span className="text-2xl sm:text-3xl font-extrabold text-indigo-900 mt-2 block tracking-tight font-sans">
+                {formatDuration((todayTotals?.todayShiftDuration ?? currentProfile?.todayShiftDuration) || 0)}
               </span>
               <span className="text-[11px] font-semibold text-slate-500 mt-1 inline-flex items-center gap-1">
-                <Monitor className="w-3 h-3 text-slate-400" /> Foreground app
+                {completedSessions.length + (isWorking ? 1 : 0)} session{completedSessions.length + (isWorking ? 1 : 0) === 1 ? '' : 's'} recorded today
               </span>
             </div>
           </div>
         </div>
 
-        {/* 2-Column Section: Today's Timeline & Software Usage */}
+        {/* Today's Completed Attendance History */}
+        {completedSessions.length > 0 && (
+          <div className="bg-white border border-slate-200/90 rounded-3xl p-6 sm:p-7 shadow-sm">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100 flex-wrap gap-2">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-200/60 flex items-center justify-center">
+                  <History className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-slate-900">Today's Completed Work Sessions</h3>
+                  <p className="text-[11px] text-slate-500 font-medium">Authoritative attendance sessions recorded for today</p>
+                </div>
+              </div>
+              <span className="text-xs font-bold px-3 py-1 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
+                {completedSessions.length} Completed Session{completedSessions.length === 1 ? '' : 's'}
+              </span>
+            </div>
+
+            <div className="mt-4 overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-slate-100 text-slate-400 uppercase text-[10px] font-bold tracking-wider">
+                    <th className="pb-3 pr-4 font-extrabold">#</th>
+                    <th className="pb-3 px-4 font-extrabold">Clock In</th>
+                    <th className="pb-3 px-4 font-extrabold">Clock Out</th>
+                    <th className="pb-3 px-4 font-extrabold">Work Duration</th>
+                    <th className="pb-3 px-4 font-extrabold text-emerald-700">Active Work</th>
+                    <th className="pb-3 px-4 font-extrabold text-amber-700">Idle Time</th>
+                    <th className="pb-3 px-4 font-extrabold text-indigo-700">Breaks</th>
+                    <th className="pb-3 pl-4 font-extrabold text-right">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {completedSessions.map((sess: any, idx: number) => {
+                    const startStr = sess.startedAt ? new Date(sess.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
+                    const endStr = sess.endedAt ? new Date(sess.endedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
+                    const dur = sess.durationSeconds != null ? formatDuration(sess.durationSeconds) : '0m';
+                    return (
+                      <tr key={sess._id || idx} className="hover:bg-slate-50/60 transition-colors">
+                        <td className="py-3.5 pr-4 font-bold text-slate-500">Session {idx + 1}</td>
+                        <td className="py-3.5 px-4 font-mono font-bold text-slate-800">{startStr}</td>
+                        <td className="py-3.5 px-4 font-mono font-bold text-slate-800">{endStr}</td>
+                        <td className="py-3.5 px-4 font-mono font-bold text-indigo-700">{dur}</td>
+                        <td className="py-3.5 px-4 font-mono font-bold text-emerald-600">{formatDuration(sess.activeSeconds || 0)}</td>
+                        <td className="py-3.5 px-4 font-mono font-bold text-amber-600">{formatDuration(sess.idleSeconds || 0)}</td>
+                        <td className="py-3.5 px-4 font-mono font-bold text-indigo-600">{formatDuration(sess.breakSeconds || 0)}</td>
+                        <td className="py-3.5 pl-4 text-right">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                            Completed
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* 2-Column Section: Timeline & Software / Website Tracking */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8">
-          <div className="lg:col-span-2">
-            <TimelineVisualizer events={timelineEvents} dateStr={todayStr} />
+          <div className="lg:col-span-2 space-y-4">
+            {/* Timeline Date Selector Bar with View Toggle */}
+            <div className="bg-white border border-slate-200/90 rounded-2xl px-5 py-3.5 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <Calendar className="w-4 h-4 text-indigo-600 shrink-0" />
+                <div>
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block leading-tight">
+                    Activity Date
+                  </span>
+                  <span className="font-mono text-xs font-black text-slate-900 mt-0.5 block">
+                    {selectedDate}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 flex-wrap">
+                {/* View Mode Toggle: Timeline vs Detailed Logs */}
+                <div className="flex items-center bg-slate-100 p-0.5 rounded-xl border border-slate-200 text-xs font-bold mr-2">
+                  <button
+                    type="button"
+                    onClick={() => setActivityViewTab('timeline')}
+                    className={`flex items-center gap-1 px-3 py-1 rounded-lg transition-all ${
+                      activityViewTab === 'timeline'
+                        ? 'bg-white text-indigo-700 shadow-2xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <Layers className="w-3.5 h-3.5" />
+                    <span>Timeline</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActivityViewTab('logs')}
+                    className={`flex items-center gap-1 px-3 py-1 rounded-lg transition-all ${
+                      activityViewTab === 'logs'
+                        ? 'bg-white text-indigo-700 shadow-2xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <List className="w-3.5 h-3.5" />
+                    <span>Timestamp Logs ({timelineEvents.length})</span>
+                  </button>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setSelectedDate(getLocalDateString())}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                    selectedDate === getLocalDateString()
+                      ? 'bg-indigo-600 text-white shadow-2xs'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  Today
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const d = new Date();
+                    d.setDate(d.getDate() - 1);
+                    setSelectedDate(d.toISOString().slice(0, 10));
+                  }}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                    selectedDate !== getLocalDateString()
+                      ? 'bg-indigo-600 text-white shadow-2xs'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  Yesterday
+                </button>
+                <input
+                  type="date"
+                  value={selectedDate}
+                  onChange={(e) => {
+                    if (e.target.value) setSelectedDate(e.target.value);
+                  }}
+                  className="px-3 py-1 text-xs border border-slate-200 rounded-xl bg-slate-50 font-semibold text-slate-800 focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+            </div>
+
+            {activityViewTab === 'timeline' ? (
+              <TimelineVisualizer events={timelineEvents} dateStr={selectedDate} />
+            ) : (
+              <div className="bg-white border border-slate-200/90 rounded-3xl p-6 shadow-sm space-y-4">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <Clock className="w-4 h-4 text-indigo-600" />
+                    <h3 className="font-extrabold text-slate-900 text-sm">
+                      Sequential Activity & Timestamp Log
+                    </h3>
+                  </div>
+                  <span className="text-[11px] font-semibold text-slate-400">
+                    {timelineEvents.length} intervals recorded
+                  </span>
+                </div>
+
+                {timelineEvents.length === 0 ? (
+                  <p className="text-xs text-slate-400 py-12 text-center font-medium">
+                    No activity intervals recorded for {selectedDate}.
+                  </p>
+                ) : (
+                  <div className="space-y-2.5 max-h-[500px] overflow-y-auto pr-1">
+                    {[...timelineEvents].reverse().map((ev, i) => {
+                      const isIdleEv = ev.type === 'IDLE_INTERVAL' || (ev.applicationName || '').toLowerCase().includes('idle');
+                      const startFormatted = ev.startedAt ? new Date(ev.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '—';
+                      const endFormatted = ev.endedAt ? new Date(ev.endedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '—';
+
+                      return (
+                        <div
+                          key={i}
+                          className={`flex items-center justify-between p-3.5 rounded-2xl border text-xs transition-all ${
+                            isIdleEv
+                              ? 'bg-amber-50/40 border-amber-200/70 hover:bg-amber-50/70'
+                              : ev.domain || ev.websiteDomain
+                              ? 'bg-cyan-50/40 border-cyan-200/70 hover:bg-cyan-50/70'
+                              : 'bg-slate-50/70 border-slate-200/70 hover:bg-slate-50'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="shrink-0">
+                              {isIdleEv ? (
+                                <Moon className="w-4 h-4 text-amber-600" />
+                              ) : ev.domain || ev.websiteDomain ? (
+                                <Globe className="w-4 h-4 text-cyan-600" />
+                              ) : (
+                                <Monitor className="w-4 h-4 text-indigo-600" />
+                              )}
+                            </div>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-slate-900 truncate">
+                                  {isIdleEv ? 'System Inactivity (Away)' : ev.applicationName}
+                                </span>
+                                {(ev.domain || ev.websiteDomain) && (
+                                  <span className="font-mono text-[10px] text-cyan-800 bg-cyan-100/80 px-2 py-0.5 rounded font-semibold truncate">
+                                    {ev.domain || ev.websiteDomain}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2 text-[11px] text-slate-500 font-mono mt-0.5">
+                                <Clock className="w-3 h-3 text-slate-400" />
+                                <span>{startFormatted} → {endFormatted}</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="text-right shrink-0">
+                            <span className={`font-mono font-bold text-xs ${isIdleEv ? 'text-amber-700' : 'text-indigo-700'}`}>
+                              {formatDuration(ev.durationSeconds)}
+                            </span>
+                            <span className="text-[10px] text-slate-400 block font-medium">
+                              {isIdleEv ? 'Idle' : 'Productive'}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="space-y-6">
+            {/* My Top Apps */}
+            <div className="bg-white border border-slate-200/90 rounded-3xl p-6 sm:p-7 shadow-sm">
+              <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
+                <div className="flex items-center gap-2">
+                  <Monitor className="w-4 h-4 text-indigo-600" />
+                  <h3 className="font-extrabold text-slate-900 text-sm">
+                    Software Usage
+                  </h3>
+                </div>
+                <span className="text-[11px] font-semibold text-slate-400">
+                  {appUsages.filter(
+                    (a) =>
+                      !a.applicationName.toLowerCase().includes('highp') &&
+                      !a.applicationName.toLowerCase().includes('internal workforce') &&
+                      !a.applicationName.toLowerCase().includes('highphaus') &&
+                      !a.applicationName.toLowerCase().includes('electron')
+                  ).length} apps
+                </span>
+              </div>
+
+              {appUsages.filter(
+                (a) =>
+                  !a.applicationName.toLowerCase().includes('highp') &&
+                  !a.applicationName.toLowerCase().includes('internal workforce') &&
+                  !a.applicationName.toLowerCase().includes('highphaus') &&
+                  !a.applicationName.toLowerCase().includes('electron')
+              ).length === 0 ? (
+                <p className="text-xs text-slate-400 py-6 text-center">No app activity recorded for {selectedDate}.</p>
+              ) : (
+                <div className="space-y-3">
+                  {appUsages
+                    .filter(
+                      (a) =>
+                        !a.applicationName.toLowerCase().includes('highp') &&
+                        !a.applicationName.toLowerCase().includes('internal workforce') &&
+                        !a.applicationName.toLowerCase().includes('highphaus') &&
+                        !a.applicationName.toLowerCase().includes('electron')
+                    )
+                    .map((app, i) => (
+                      <div key={i} className="flex flex-col gap-1.5 p-3 rounded-2xl bg-slate-50/70 border border-slate-200/70 hover:bg-slate-50 transition-all">
+                        <div className="flex items-center justify-between text-xs">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <Monitor className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                            <span className="text-slate-900 font-bold truncate max-w-[160px] sm:max-w-[200px]" title={app.applicationName}>
+                              {app.applicationName}
+                            </span>
+                            {app.category && (
+                              <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 font-bold border border-indigo-100 shrink-0">
+                                {app.category}
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-indigo-700 font-mono font-bold text-xs shrink-0">
+                            {formatDuration(app.totalSeconds)}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between text-[11px] text-slate-500">
+                          <span className="flex items-center gap-1 font-medium">
+                            <Clock className="w-3 h-3 text-slate-400" />
+                            {app.lastUsedAt ? (
+                              <span>Last active at {new Date(app.lastUsedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                            ) : (
+                              <span>Tracked today</span>
+                            )}
+                          </span>
+                          <span className="font-mono text-[10px] text-slate-400 font-semibold">
+                            {app.percentage ? `${app.percentage}%` : ''}
+                          </span>
+                        </div>
+                        {app.percentage > 0 && (
+                          <div className="w-full bg-slate-200/80 h-1.5 rounded-full overflow-hidden">
+                            <div
+                              className="bg-indigo-600 h-full rounded-full transition-all duration-500"
+                              style={{ width: `${Math.min(100, app.percentage)}%` }}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                </div>
+              )}
+            </div>
+
+            {/* Websites Visited */}
+            <div className="bg-white border border-slate-200/90 rounded-3xl p-6 sm:p-7 shadow-sm">
+              <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
+                <div className="flex items-center gap-2">
+                  <Globe className="w-4 h-4 text-cyan-600" />
+                  <h3 className="font-extrabold text-slate-900 text-sm">
+                    Websites Visited
+                  </h3>
+                </div>
+                <span className="text-[11px] font-semibold text-slate-400">
+                  {websiteUsages.length} domains
+                </span>
+              </div>
+
+              {websiteUsages.length === 0 ? (
+                <p className="text-xs text-slate-400 py-6 text-center">No website activity recorded for {selectedDate}.</p>
+              ) : (
+                <div className="space-y-3">
+                  {websiteUsages.map((site, i) => (
+                    <div key={i} className="flex flex-col gap-1.5 p-3 rounded-2xl bg-cyan-50/40 border border-cyan-100 hover:bg-cyan-50/70 transition-all">
+                      <div className="flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <Globe className="w-3.5 h-3.5 text-cyan-600 shrink-0" />
+                          <span className="text-slate-900 font-bold truncate max-w-[160px] sm:max-w-[200px]" title={site.domain}>
+                            {site.domain}
+                          </span>
+                          {site.browser && (
+                            <span className="text-[9px] uppercase px-1.5 py-0.5 rounded bg-white text-cyan-800 font-bold border border-cyan-200 shrink-0">
+                              {site.browser}
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-cyan-800 font-mono font-bold text-xs shrink-0">
+                          {formatDuration(site.totalSeconds)}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-[11px] text-slate-500">
+                        <span className="flex items-center gap-1 font-medium">
+                          <Clock className="w-3 h-3 text-cyan-500" />
+                          {site.lastUsedAt ? (
+                            <span>Last visited at {new Date(site.lastUsedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                          ) : (
+                            <span>Visited today</span>
+                          )}
+                        </span>
+                        <span className="font-mono text-[10px] text-slate-400 font-semibold">
+                          {site.percentage ? `${site.percentage}%` : ''}
+                        </span>
+                      </div>
+                      {site.percentage > 0 && (
+                        <div className="w-full bg-cyan-100 h-1.5 rounded-full overflow-hidden">
+                          <div
+                            className="bg-cyan-600 h-full rounded-full transition-all duration-500"
+                            style={{ width: `${Math.min(100, site.percentage)}%` }}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
             {/* Transparency Pledge */}
             <div className="bg-white border border-slate-200/90 rounded-3xl p-6 sm:p-7 shadow-sm">
               <div className="flex items-center gap-2.5 mb-3 text-indigo-600">
@@ -840,52 +1494,13 @@ const getBrowserAppName = (): string => {
                 </div>
                 <div className="flex items-center gap-2 text-slate-800 font-semibold">
                   <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                  <span>Work Shift & Break Durations</span>
+                  <span>Websites Visited & Exact Timestamps</span>
                 </div>
                 <div className="flex items-center gap-2 text-slate-800 font-semibold">
                   <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                  <span>No Keystrokes or Screen Capture</span>
+                  <span>Working Hours & Break Durations</span>
                 </div>
               </div>
-            </div>
-
-            {/* My Top Apps Today */}
-            <div className="bg-white border border-slate-200/90 rounded-3xl p-6 sm:p-7 shadow-sm">
-              <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
-                <h3 className="font-extrabold text-slate-900 text-sm">
-                  My Software Usage Today
-                </h3>
-                <span className="text-[11px] font-semibold text-slate-400">
-                  {appUsages.length} apps
-                </span>
-              </div>
-
-              {appUsages.filter(
-                (a) =>
-                  !a.applicationName.toLowerCase().includes('highp') &&
-                  !a.applicationName.toLowerCase().includes('internal workforce') &&
-                  !a.applicationName.toLowerCase().includes('highphaus') &&
-                  !a.applicationName.toLowerCase().includes('electron')
-              ).length === 0 ? (
-                <p className="text-xs text-slate-400 py-6 text-center">No app activity recorded yet today.</p>
-              ) : (
-                <div className="space-y-3">
-                  {appUsages
-                    .filter(
-                      (a) =>
-                        !a.applicationName.toLowerCase().includes('highp') &&
-                        !a.applicationName.toLowerCase().includes('internal workforce') &&
-                        !a.applicationName.toLowerCase().includes('highphaus') &&
-                        !a.applicationName.toLowerCase().includes('electron')
-                    )
-                    .map((app, i) => (
-                      <div key={i} className="flex items-center justify-between text-xs py-1.5">
-                        <span className="text-slate-800 font-bold truncate max-w-[170px]">{app.applicationName}</span>
-                        <span className="text-indigo-600 font-mono font-bold text-xs">{formatDuration(app.totalSeconds)}</span>
-                      </div>
-                    ))}
-                </div>
-              )}
             </div>
           </div>
         </div>

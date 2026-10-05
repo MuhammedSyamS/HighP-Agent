@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
+  CalendarCheck,
   PieChart,
   FileBarChart,
   Laptop,
@@ -30,6 +31,7 @@ export const Sidebar: React.FC = () => {
     ...(canAccessDashboard
       ? [
           { name: 'Live Dashboard', href: '/dashboard', icon: LayoutDashboard },
+          { name: 'Attendance Data', href: '/dashboard/attendance', icon: CalendarCheck },
           { name: 'App Tracking', href: '/dashboard/settings?tab=applications', icon: Layers },
           { name: 'App & Web Analytics', href: '/dashboard/applications', icon: PieChart },
           { name: 'Reports', href: '/dashboard/reports', icon: FileBarChart },

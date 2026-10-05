@@ -78,7 +78,7 @@ export default function EmployeeMonitoringTransparencyPage() {
                 <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
                 <div>
                   <strong className="text-slate-800">Work Sessions & Breaks:</strong>
-                  <p className="text-[11px] text-slate-500">Timestamps when you start work, pause for official breaks (lunch, coffee), and end your daily shift.</p>
+                  <p className="text-[11px] text-slate-500">Timestamps when you start work, pause for official breaks (lunch, coffee), and end your work session.</p>
                 </div>
               </li>
               <li className="flex items-start gap-2.5">

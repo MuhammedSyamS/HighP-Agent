@@ -174,6 +174,31 @@ export default function EmployeeDetailPage() {
                 {devices[0]?.deviceName || 'Windows Workstation'}
               </span>
             </div>
+            <div className="h-8 w-px bg-slate-200" />
+            <div>
+              <span className="text-[10px] font-bold text-slate-500 block uppercase tracking-wider">Start Work (Clock In)</span>
+              <span className="font-bold text-slate-900 mt-0.5 block font-mono text-xs">
+                {profile?.todayShiftStartedAt
+                  ? new Date(profile.todayShiftStartedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                  : 'Not Started'}
+              </span>
+            </div>
+            <div className="h-8 w-px bg-slate-200" />
+            <div>
+              <span className="text-[10px] font-bold text-slate-500 block uppercase tracking-wider">End Work (Clock Out)</span>
+              <span className="font-bold text-slate-900 mt-0.5 block font-mono text-xs">
+                {profile?.todayShiftEndedAt ? (
+                  new Date(profile.todayShiftEndedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                ) : (profile?.todayAttendanceStatus === 'PRESENT' || profile?.currentStatus !== 'OFFLINE') && profile?.todayShiftStartedAt ? (
+                  <span className="text-emerald-700 inline-flex items-center gap-1 font-sans font-bold">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    Working Now
+                  </span>
+                ) : (
+                  '—'
+                )}
+              </span>
+            </div>
           </div>
         </div>
 

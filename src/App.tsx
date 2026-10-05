@@ -5,6 +5,7 @@ import LoginPage from './app/(auth)/login/page';
 import RegisterPage from './app/(auth)/register/page';
 import DashboardLayout from './app/dashboard/layout';
 import DashboardOverviewPage from './app/dashboard/page';
+import AttendanceDataPage from './app/dashboard/attendance/page';
 import ApplicationsPage from './app/dashboard/applications/page';
 import ReportsPage from './app/dashboard/reports/page';
 import DevicesPage from './app/dashboard/devices/page';
@@ -24,6 +25,7 @@ export default function App() {
       {/* Dashboard Routes with Nested Layout */}
       <Route path="/dashboard" element={<DashboardLayout />}>
         <Route index element={<DashboardOverviewPage />} />
+        <Route path="attendance" element={<AttendanceDataPage />} />
         <Route path="applications" element={<ApplicationsPage />} />
         <Route path="reports" element={<ReportsPage />} />
         <Route path="devices" element={<DevicesPage />} />
