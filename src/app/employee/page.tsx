@@ -687,7 +687,7 @@ const getBrowserAppName = (): string => {
   return (
     <div className="flex-1 flex flex-col min-h-0 bg-[#F8FAFC] text-slate-900 selection:bg-indigo-600 selection:text-white">
       {/* Top Header */}
-      <header className="bg-white/90 backdrop-blur-md border-b border-slate-200 px-6 sm:px-10 py-4 flex items-center justify-between sticky top-0 z-20 transition-all">
+      <header className="bg-white/95 backdrop-blur-md border-b border-slate-200 px-3.5 xs:px-6 sm:px-10 py-3 sm:py-4 flex items-center justify-between sticky top-0 z-20 transition-all w-full">
         <div className="flex items-center gap-4">
           {user?.role !== 'EMPLOYEE' && (
             <Link
@@ -861,24 +861,24 @@ const getBrowserAppName = (): string => {
             </div>
 
             {/* Main Action Buttons */}
-            <div className="flex flex-col sm:flex-row sm:items-center gap-3.5 relative z-10 shrink-0">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3 relative z-10 shrink-0 w-full lg:w-auto">
               {!isWorking ? (
                 <button
                   onClick={handleStartWork}
                   disabled={loading}
-                  className="w-full sm:w-auto justify-center flex items-center gap-2.5 px-8 py-4 rounded-2xl bg-black hover:bg-slate-800 text-white font-black text-sm shadow-md transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
+                  className="w-full sm:w-auto justify-center flex items-center gap-2.5 px-8 py-3.5 sm:py-4 rounded-2xl bg-black hover:bg-slate-800 text-white font-black text-sm shadow-md transition-all hover:scale-105 active:scale-95 disabled:opacity-50 min-h-[48px]"
                 >
-                  <Play className="w-5 h-5 fill-current text-white" />
+                  <Play className="w-5 h-5 fill-current text-white shrink-0" />
                   <span>Start Work</span>
                 </button>
               ) : (
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3 w-full sm:w-auto">
                   {!isOnBreak ? (
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-col xs:flex-row items-stretch xs:items-center gap-2 w-full sm:w-auto">
                       <select
                         value={breakReason}
                         onChange={(e) => setBreakReason(e.target.value)}
-                        className="px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-indigo-500 shadow-2xs"
+                        className="px-3.5 py-2.5 sm:px-4 sm:py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-indigo-500 shadow-2xs min-h-[44px]"
                       >
                         <option value={BreakReason.LUNCH}>🥪 Lunch Break</option>
                         <option value={BreakReason.COFFEE}>☕ Coffee Break</option>
@@ -888,9 +888,9 @@ const getBrowserAppName = (): string => {
                       <button
                         onClick={handleStartBreak}
                         disabled={loading}
-                        className="flex items-center gap-2 px-5 py-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs shadow-sm transition-all active:scale-95 whitespace-nowrap"
+                        className="flex items-center justify-center gap-2 px-4 sm:px-5 py-2.5 sm:py-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs shadow-sm transition-all active:scale-95 whitespace-nowrap min-h-[44px]"
                       >
-                        <Coffee className="w-4 h-4" />
+                        <Coffee className="w-4 h-4 shrink-0" />
                         <span>Take Break</span>
                       </button>
                     </div>
@@ -898,9 +898,9 @@ const getBrowserAppName = (): string => {
                     <button
                       onClick={handleEndBreak}
                       disabled={loading}
-                      className="w-full sm:w-auto justify-center flex items-center gap-2 px-6 py-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md shadow-indigo-600/20 transition-all active:scale-95"
+                      className="w-full sm:w-auto justify-center flex items-center gap-2 px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md shadow-indigo-600/20 transition-all active:scale-95 min-h-[44px]"
                     >
-                      <Play className="w-4 h-4 fill-current" />
+                      <Play className="w-4 h-4 fill-current shrink-0" />
                       <span>Resume Work</span>
                     </button>
                   )}
@@ -908,9 +908,9 @@ const getBrowserAppName = (): string => {
                   <button
                     onClick={handleEndWork}
                     disabled={loading}
-                    className="w-full sm:w-auto justify-center flex items-center gap-2 px-5 py-3.5 rounded-xl bg-white hover:bg-rose-50 text-rose-700 font-bold text-xs border border-rose-200 shadow-2xs transition-all active:scale-95"
+                    className="w-full sm:w-auto justify-center flex items-center gap-2 px-5 py-3 rounded-xl bg-white hover:bg-rose-50 text-rose-700 font-bold text-xs border border-rose-200 shadow-2xs transition-all active:scale-95 min-h-[44px]"
                   >
-                    <Square className="w-4 h-4 fill-current text-rose-600" />
+                    <Square className="w-4 h-4 fill-current text-rose-600 shrink-0" />
                     <span>Clock Out</span>
                   </button>
                 </div>
@@ -954,8 +954,8 @@ const getBrowserAppName = (): string => {
               </div>
             </div>
 
-            <div className="flex items-center gap-4 sm:gap-7 text-xs flex-wrap sm:flex-nowrap">
-              <div className="bg-white px-3.5 py-2 rounded-xl border border-slate-200 shadow-2xs">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 w-full">
+              <div className="bg-white px-3.5 py-2.5 rounded-xl border border-slate-200 shadow-2xs">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
                   {isWorking ? 'Start Work (Current Session)' : lastCompletedSession ? 'Start Work (Last Session)' : 'Start Work (Clock In)'}
                 </span>
@@ -1050,8 +1050,8 @@ const getBrowserAppName = (): string => {
           )}
 
           {/* Metric Grid: Today's Cumulative Totals */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6 mt-9 pt-7 border-t border-slate-100 text-center relative z-10">
-            <div className="bg-slate-50/80 p-5 rounded-2xl border border-slate-200/80 shadow-2xs transition-all hover:bg-slate-50">
+          <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-6 mt-8 pt-6 border-t border-slate-100 text-center relative z-10">
+            <div className="bg-slate-50/80 p-4 sm:p-5 rounded-2xl border border-slate-200/80 shadow-2xs transition-all hover:bg-slate-50">
               <span className="text-[11px] font-bold text-slate-500 block uppercase tracking-wider">
                 Active Work Today
               </span>

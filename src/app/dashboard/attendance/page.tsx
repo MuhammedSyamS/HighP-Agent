@@ -646,8 +646,8 @@ export default function AttendanceDataPage() {
       {viewMode === 'daily' && (
         <div className="space-y-8 animate-fade-in">
           {/* DAILY KPI METRIC CARDS */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
-            <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-2xs">
+          <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
+            <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-2xs">
               <div className="flex items-center justify-between">
                 <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Total Workforce</span>
                 <Users className="w-4 h-4 text-slate-400" />

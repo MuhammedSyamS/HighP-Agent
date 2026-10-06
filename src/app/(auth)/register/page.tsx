@@ -37,13 +37,13 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8 selection:bg-black selection:text-white relative overflow-hidden">
+    <div className="min-h-screen bg-[#F8FAFC] flex flex-col justify-center py-8 sm:py-12 px-3.5 xs:px-4 sm:px-6 lg:px-8 selection:bg-black selection:text-white relative overflow-hidden">
       {/* Subtle modern background grid */}
       <div className="absolute inset-0 bg-[radial-gradient(#e2e8f0_1px,transparent_1px)] [background-size:24px_24px] opacity-70 pointer-events-none" />
 
       <div className="sm:mx-auto sm:w-full sm:max-w-md text-center relative z-10">
         <Link to="/" className="inline-flex items-center gap-3 group transition-transform hover:scale-102">
-          <div className="w-10 h-10 rounded-xl bg-black text-white font-black text-xl flex items-center justify-center shadow-lg shadow-black/10">
+          <div className="w-10 h-10 rounded-xl bg-black text-white font-black text-xl flex items-center justify-center shadow-lg shadow-black/10 shrink-0">
             ⚡
           </div>
           <div className="text-left">
@@ -55,14 +55,14 @@ export default function RegisterPage() {
             </span>
           </div>
         </Link>
-        <h2 className="mt-6 text-2xl font-black text-slate-900 tracking-tight">Register New Organization</h2>
+        <h2 className="mt-5 sm:mt-6 text-2xl font-black text-slate-900 tracking-tight">Register New Organization</h2>
         <p className="mt-1.5 text-xs sm:text-sm text-slate-500">
           Setup automated workforce monitoring and desktop telemetry for your team
         </p>
       </div>
 
-      <div className="mt-7 sm:mx-auto sm:w-full sm:max-w-md relative z-10">
-        <div className="bg-white border border-slate-200/90 shadow-xl shadow-slate-200/50 rounded-2xl py-8 px-6 sm:px-10">
+      <div className="mt-6 sm:mt-7 sm:mx-auto sm:w-full sm:max-w-md relative z-10 w-full">
+        <div className="bg-white border border-slate-200/90 shadow-xl shadow-slate-200/50 rounded-2xl py-6 sm:py-8 px-4 xs:px-6 sm:px-10">
           {error && (
             <div className="mb-6 p-3.5 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs font-semibold flex items-start gap-2.5">
               <span>⚠️</span>
@@ -84,13 +84,13 @@ export default function RegisterPage() {
                   required
                   value={companyName}
                   onChange={(e) => setCompanyName(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-300 rounded-xl text-slate-900 text-sm focus:outline-none focus:border-black focus:ring-1 focus:ring-black placeholder:text-slate-400 font-medium"
+                  className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-300 rounded-xl text-slate-900 text-sm focus:outline-none focus:border-black focus:ring-1 focus:ring-black placeholder:text-slate-400 font-medium min-h-[44px]"
                   placeholder="e.g. Highphaus Agency"
                 />
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                   First Name
@@ -104,7 +104,7 @@ export default function RegisterPage() {
                     required
                     value={firstName}
                     onChange={(e) => setFirstName(e.target.value)}
-                    className="w-full pl-10 pr-3 py-2.5 bg-white border border-slate-300 rounded-xl text-slate-900 text-sm focus:outline-none focus:border-black focus:ring-1 focus:ring-black placeholder:text-slate-400 font-medium"
+                    className="w-full pl-10 pr-3 py-2.5 bg-white border border-slate-300 rounded-xl text-slate-900 text-sm focus:outline-none focus:border-black focus:ring-1 focus:ring-black placeholder:text-slate-400 font-medium min-h-[44px]"
                     placeholder="Alex"
                   />
                 </div>
@@ -118,8 +118,8 @@ export default function RegisterPage() {
                   required
                   value={lastName}
                   onChange={(e) => setLastName(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-slate-900 text-sm focus:outline-none focus:border-black focus:ring-1 focus:ring-black placeholder:text-slate-400 font-medium"
-                  placeholder="Smith"
+                  className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-slate-900 text-sm focus:outline-none focus:border-black focus:ring-1 focus:ring-black placeholder:text-slate-400 font-medium min-h-[44px]"
+                  placeholder="Morgan"
                 />
               </div>
             </div>

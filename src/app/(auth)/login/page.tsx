@@ -374,14 +374,14 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8 selection:bg-black selection:text-white relative overflow-hidden">
+    <div className="min-h-screen bg-[#F8FAFC] flex flex-col justify-center py-8 sm:py-12 px-3.5 xs:px-4 sm:px-6 lg:px-8 selection:bg-black selection:text-white relative overflow-hidden">
       {/* Subtle modern background grid */}
       <div className="absolute inset-0 bg-[radial-gradient(#e2e8f0_1px,transparent_1px)] [background-size:24px_24px] opacity-70 pointer-events-none" />
 
       {/* Brand Header */}
       <div className="sm:mx-auto sm:w-full sm:max-w-md text-center relative z-10">
         <Link to="/" className="inline-flex items-center gap-3 group transition-transform hover:scale-102">
-          <div className="w-10 h-10 rounded-xl bg-black text-white font-black text-xl flex items-center justify-center shadow-lg shadow-black/10">
+          <div className="w-10 h-10 rounded-xl bg-black text-white font-black text-xl flex items-center justify-center shadow-lg shadow-black/10 shrink-0">
             ⚡
           </div>
           <div className="text-left">
@@ -394,7 +394,7 @@ export default function LoginPage() {
           </div>
         </Link>
 
-        <h2 className="mt-6 text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+        <h2 className="mt-5 sm:mt-6 text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
           {authMode === 'login' ? 'Sign In to Workspace' : 'Create an Account'}
         </h2>
         <p className="mt-1.5 text-xs sm:text-sm text-slate-500 max-w-sm mx-auto">
@@ -404,7 +404,7 @@ export default function LoginPage() {
         </p>
       </div>
 
-      <div className="mt-7 sm:mx-auto sm:w-full sm:max-w-md relative z-10">
+      <div className="mt-6 sm:mt-7 sm:mx-auto sm:w-full sm:max-w-md relative z-10 w-full">
         <div className="bg-white border border-slate-200/90 shadow-xl shadow-slate-200/50 rounded-2xl overflow-hidden">
           {/* Main Auth Mode Switcher */}
           <div className="grid grid-cols-2 p-1.5 bg-slate-100/80 border-b border-slate-200/80 text-xs font-bold">
@@ -415,13 +415,13 @@ export default function LoginPage() {
                 setLoginError('');
                 setOtpError('');
               }}
-              className={`py-2.5 px-4 rounded-xl transition-all flex items-center justify-center gap-2 ${
+              className={`py-2.5 px-4 rounded-xl transition-all flex items-center justify-center gap-2 min-h-[44px] ${
                 authMode === 'login'
                   ? 'bg-black text-white shadow-sm'
                   : 'text-slate-600 hover:text-black hover:bg-white/60'
               }`}
             >
-              <LogIn className="w-3.5 h-3.5" /> Sign In
+              <LogIn className="w-3.5 h-3.5 shrink-0" /> <span>Sign In</span>
             </button>
             <button
               type="button"
@@ -429,19 +429,19 @@ export default function LoginPage() {
                 setAuthMode('signup');
                 setSignupError('');
               }}
-              className={`py-2.5 px-4 rounded-xl transition-all flex items-center justify-center gap-2 ${
+              className={`py-2.5 px-4 rounded-xl transition-all flex items-center justify-center gap-2 min-h-[44px] ${
                 authMode === 'signup'
                   ? 'bg-black text-white shadow-sm'
                   : 'text-slate-600 hover:text-black hover:bg-white/60'
               }`}
             >
-              <UserPlus className="w-3.5 h-3.5" /> Sign Up
+              <UserPlus className="w-3.5 h-3.5 shrink-0" /> <span>Sign Up</span>
             </button>
           </div>
 
           {/* SIGN IN TAB */}
           {authMode === 'login' && (
-            <div className="p-6 sm:p-8">
+            <div className="p-4 xs:p-6 sm:p-8">
               {sessionExpiredNotice && (
                 <div className="mb-5 p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-semibold flex items-start gap-2.5">
                   <span className="text-base">⏳</span>
@@ -736,7 +736,7 @@ export default function LoginPage() {
               )}
 
               <form onSubmit={handleSignupSubmit} className="space-y-3.5">
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                       First Name
@@ -750,7 +750,7 @@ export default function LoginPage() {
                         required
                         value={firstName}
                         onChange={(e) => setFirstName(e.target.value)}
-                        className="w-full pl-9 pr-3 py-2 bg-white border border-slate-300 rounded-xl text-slate-900 text-sm focus:outline-none focus:border-black focus:ring-1 focus:ring-black placeholder:text-slate-400 font-medium"
+                        className="w-full pl-9 pr-3 py-2.5 bg-white border border-slate-300 rounded-xl text-slate-900 text-sm focus:outline-none focus:border-black focus:ring-1 focus:ring-black placeholder:text-slate-400 font-medium min-h-[44px]"
                         placeholder="John"
                       />
                     </div>
@@ -765,7 +765,7 @@ export default function LoginPage() {
                       required
                       value={lastName}
                       onChange={(e) => setLastName(e.target.value)}
-                      className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-slate-900 text-sm focus:outline-none focus:border-black focus:ring-1 focus:ring-black placeholder:text-slate-400 font-medium"
+                      className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-slate-900 text-sm focus:outline-none focus:border-black focus:ring-1 focus:ring-black placeholder:text-slate-400 font-medium min-h-[44px]"
                       placeholder="Doe"
                     />
                   </div>
