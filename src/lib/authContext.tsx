@@ -30,9 +30,12 @@ interface AuthContextType {
   token: string | null;
   isLoading: boolean;
   login: (email: string, pass: string) => Promise<any>;
+  loginWithOtp: (email: string, otp: string) => Promise<any>;
+  sendOtp: (email: string, purpose: 'LOGIN' | 'FORGOT_PASSWORD' | 'SIGNUP') => Promise<any>;
+  resetPasswordWithOtp: (email: string, otp: string, newPassword: string) => Promise<any>;
   signup: (data: any) => Promise<any>;
   registerCompany: (data: any) => Promise<any>;
-  logout: () => Promise<void>;
+  logout: (redirectUrl?: string | any) => Promise<void>;
   refreshAuth: () => Promise<void>;
 }
 
@@ -149,6 +152,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.setItem('highp_refresh_token', tokens.refreshToken);
     localStorage.setItem('highp_user', JSON.stringify(u));
     localStorage.setItem('highp_company', JSON.stringify(c));
+    if (u?.email) {
+      localStorage.setItem('highp_last_email', u.email);
+    }
     if (p) {
       localStorage.setItem('highp_profile', JSON.stringify(p));
     }
@@ -164,6 +170,40 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return res.data;
   };
 
+  const sendOtp = async (email: string, purpose: 'LOGIN' | 'FORGOT_PASSWORD' | 'SIGNUP') => {
+    const res = await api.post('/auth/otp/send', { email, purpose });
+    return res.data;
+  };
+
+  const loginWithOtp = async (email: string, otp: string) => {
+    const res = await api.post('/auth/otp/verify-login', { email, otp });
+    const { user: u, company: c, tokens, profile: p } = res.data.data;
+
+    localStorage.setItem('highp_token', tokens.accessToken);
+    localStorage.setItem('highp_refresh_token', tokens.refreshToken);
+    localStorage.setItem('highp_user', JSON.stringify(u));
+    localStorage.setItem('highp_company', JSON.stringify(c));
+    if (u?.email) {
+      localStorage.setItem('highp_last_email', u.email);
+    }
+    if (p) {
+      localStorage.setItem('highp_profile', JSON.stringify(p));
+    }
+
+    setToken(tokens.accessToken);
+    setUser(u);
+    setCompany(c);
+    if (p) setProfile(p);
+
+    getSocket(tokens.accessToken);
+    return res.data;
+  };
+
+  const resetPasswordWithOtp = async (email: string, otp: string, newPassword: string) => {
+    const res = await api.post('/auth/otp/reset-password', { email, otp, newPassword });
+    return res.data;
+  };
+
   const signup = async (data: any) => {
     const res = await api.post('/auth/signup', data);
     const { user: u, company: c, tokens, profile: p } = res.data.data;
@@ -172,6 +212,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.setItem('highp_refresh_token', tokens.refreshToken);
     localStorage.setItem('highp_user', JSON.stringify(u));
     localStorage.setItem('highp_company', JSON.stringify(c));
+    if (u?.email) {
+      localStorage.setItem('highp_last_email', u.email);
+    }
     if (p) {
       localStorage.setItem('highp_profile', JSON.stringify(p));
     }
@@ -202,10 +245,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return res.data;
   };
 
-  const logout = async () => {
+  const logout = async (redirectUrl?: string | any) => {
     try {
       await api.post('/auth/logout');
     } catch {}
+    if (user?.email) {
+      localStorage.setItem('highp_last_email', user.email);
+    }
     localStorage.removeItem('highp_token');
     localStorage.removeItem('highp_refresh_token');
     localStorage.removeItem('highp_user');
@@ -216,8 +262,54 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setProfile(null);
     setToken(null);
     disconnectSocket();
-    window.location.href = '/login';
+    const targetUrl = typeof redirectUrl === 'string' ? redirectUrl : '/login';
+    window.location.href = targetUrl;
   };
+
+  // Idle Auto-Logout: automatically logs out after 30 minutes of user inactivity
+  useEffect(() => {
+    if (!token || !user) return;
+
+    const IDLE_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
+    let timeoutId: NodeJS.Timeout;
+
+    const performAutoLogout = () => {
+      const email = user?.email || '';
+      if (email) {
+        localStorage.setItem('highp_last_email', email);
+      }
+      localStorage.setItem('highp_session_expired', 'true');
+      logout('/login?reason=idle_timeout');
+    };
+
+    const resetTimer = () => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(performAutoLogout, IDLE_TIMEOUT_MS);
+    };
+
+    let lastInteraction = Date.now();
+    const handleActivity = () => {
+      const now = Date.now();
+      if (now - lastInteraction > 5000) {
+        lastInteraction = now;
+        resetTimer();
+      }
+    };
+
+    resetTimer();
+
+    const activityEvents = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart', 'click'];
+    activityEvents.forEach((evt) => {
+      window.addEventListener(evt, handleActivity, { passive: true });
+    });
+
+    return () => {
+      clearTimeout(timeoutId);
+      activityEvents.forEach((evt) => {
+        window.removeEventListener(evt, handleActivity);
+      });
+    };
+  }, [token, user]);
 
   return (
     <AuthContext.Provider
@@ -228,6 +320,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         token,
         isLoading,
         login,
+        loginWithOtp,
+        sendOtp,
+        resetPasswordWithOtp,
         signup,
         registerCompany,
         logout,
