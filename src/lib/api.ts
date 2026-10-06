@@ -89,7 +89,7 @@ class ApiClient {
       }
     }
 
-    const effectiveTimeoutMs = options.timeoutMs || 25000;
+    const effectiveTimeoutMs = options.timeoutMs || 45000;
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), effectiveTimeoutMs);
 
@@ -107,7 +107,9 @@ class ApiClient {
       const isAbort = networkError.name === 'AbortError';
       const timeoutSec = Math.round(effectiveTimeoutMs / 1000);
       const err: any = new Error(
-        isAbort ? `Request timed out after ${timeoutSec} seconds` : (networkError.message || 'Network request failed')
+        isAbort
+          ? `Server connection timed out (${timeoutSec}s). Render backend may be waking up, please try again.`
+          : (networkError.message || 'Network request failed')
       );
       err.response = { status: 0, data: { success: false, message: err.message } };
       throw err;
