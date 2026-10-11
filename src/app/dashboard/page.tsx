@@ -652,6 +652,12 @@ export default function DashboardOverviewPage() {
               <Download className="w-3.5 h-3.5 text-indigo-600" /> Desktop Agent (.exe)
             </a>
             <Link
+              to="/dashboard/employees"
+              className="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 border border-slate-200 text-xs font-semibold transition-all shadow-2xs hover:border-slate-300 min-h-[40px]"
+            >
+              <Users className="w-3.5 h-3.5 text-indigo-600" /> Employees
+            </Link>
+            <Link
               to="/dashboard/reports"
               className="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 border border-slate-200 text-xs font-semibold transition-all shadow-2xs hover:border-slate-300 min-h-[40px]"
             >

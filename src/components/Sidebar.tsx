@@ -13,7 +13,8 @@ import {
   X,
   Layers,
   ChevronRight,
-  Coins
+  Coins,
+  Users
 } from 'lucide-react';
 import { useAuth } from '../lib/authContext';
 import { UserRole } from '@highp/shared';
@@ -43,6 +44,7 @@ export const Sidebar: React.FC = () => {
     ...(canAccessDashboard
       ? [
           { name: 'Live Dashboard', href: '/dashboard', icon: LayoutDashboard },
+          { name: 'Employees', href: '/dashboard/employees', icon: Users },
           { name: 'Attendance Data', href: '/dashboard/attendance', icon: CalendarCheck },
           { name: 'Payroll & Salaries', href: '/dashboard/payroll', icon: Coins },
           { name: 'App Tracking', href: '/dashboard/settings?tab=applications', icon: Layers },

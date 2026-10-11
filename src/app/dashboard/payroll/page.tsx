@@ -909,6 +909,18 @@ export default function PayrollDashboardPage() {
                 />
               </div>
 
+              <div className="p-3 rounded-xl bg-violet-50/70 border border-violet-200/80 text-xs">
+                <div className="flex items-center justify-between text-violet-900 font-bold mb-1">
+                  <span>Overtime Pay Rate</span>
+                  <span className="font-mono text-sm text-violet-700">
+                    {currencySymbol}{(editRateValue * editOtMultiplier).toFixed(2)}/hr
+                  </span>
+                </div>
+                <p className="text-[11px] text-violet-600 font-medium">
+                  Hours exceeding {editStdHours}h per day are billed at {editOtMultiplier}x standard wage.
+                </p>
+              </div>
+
               {rateSuccessMsg && (
                 <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4 shrink-0" />

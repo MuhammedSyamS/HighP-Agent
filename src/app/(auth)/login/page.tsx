@@ -26,13 +26,14 @@ import { UserRole } from '@highp/shared';
 type AuthMode = 'login' | 'signup';
 type LoginMethod = 'password' | 'otp';
 
-const DEPARTMENTS = [
-  'Engineering & Development',
-  'Design & Creative',
-  'Marketing & Growth',
-  'Operations & Logistics',
-  'Customer Success & Support',
-  'General'
+const ROLES_AND_DESIGNATIONS = [
+  'Graphic Designer',
+  'Developer',
+  'Digital Marketer',
+  'Founder',
+  'Videographer',
+  'Editor',
+  'Other'
 ];
 
 export default function LoginPage() {
@@ -94,7 +95,8 @@ export default function LoginPage() {
   const [signupEmail, setSignupEmail] = useState('');
   const [signupPassword, setSignupPassword] = useState('');
   const [showSignupPassword, setShowSignupPassword] = useState(false);
-  const [department, setDepartment] = useState('Engineering & Development');
+  const [selectedRole, setSelectedRole] = useState('Developer');
+  const [customRole, setCustomRole] = useState('');
   const [signupOtp, setSignupOtp] = useState('');
   const [signupOtpSent, setSignupOtpSent] = useState(false);
   const [signupOtpSending, setSignupOtpSending] = useState(false);
@@ -275,7 +277,7 @@ export default function LoginPage() {
       return;
     }
 
-    setSignupLoading(true);
+    const effectiveRole = selectedRole === 'Other' ? (customRole.trim() || 'Other') : selectedRole;
 
     try {
       await signup({
@@ -284,7 +286,8 @@ export default function LoginPage() {
         email: cleanEmail,
         password: signupPassword,
         otp: cleanOtp,
-        department
+        department: effectiveRole,
+        designation: effectiveRole
       });
       navigate('/employee');
     } catch (err: any) {
@@ -864,24 +867,36 @@ export default function LoginPage() {
 
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                    Department
+                    Role / Designation
                   </label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
                       <Briefcase className="w-3.5 h-3.5" />
                     </div>
                     <select
-                      value={department}
-                      onChange={(e) => setDepartment(e.target.value)}
+                      value={selectedRole}
+                      onChange={(e) => setSelectedRole(e.target.value)}
                       className="w-full pl-9 pr-3 py-2 bg-white border border-slate-300 rounded-xl text-slate-900 text-sm focus:outline-none focus:border-black focus:ring-1 focus:ring-black font-medium"
                     >
-                      {DEPARTMENTS.map((dept) => (
-                        <option key={dept} value={dept}>
-                          {dept}
+                      {ROLES_AND_DESIGNATIONS.map((r) => (
+                        <option key={r} value={r}>
+                          {r}
                         </option>
                       ))}
                     </select>
                   </div>
+                  {selectedRole === 'Other' && (
+                    <div className="mt-2.5">
+                      <input
+                        type="text"
+                        required
+                        value={customRole}
+                        onChange={(e) => setCustomRole(e.target.value)}
+                        placeholder="Enter your custom role or designation..."
+                        className="w-full px-3.5 py-2 bg-white border border-slate-300 rounded-xl text-slate-900 text-sm focus:outline-none focus:border-black focus:ring-1 focus:ring-black font-medium placeholder:text-slate-400"
+                      />
+                    </div>
+                  )}
                 </div>
 
                 <button
