@@ -23,6 +23,7 @@ import {
   CheckCircle2,
   LogOut,
   ArrowLeft,
+  ArrowRight,
   Download,
   Check,
   AlertCircle,
@@ -35,7 +36,10 @@ import {
   Coins,
   DollarSign,
   FileText,
-  Printer
+  Printer,
+  Filter,
+  Search,
+  Timer
 } from 'lucide-react';
 import { ActivityState, BreakReason } from '@highp/shared';
 import { getDesktopAgentDownloadUrl } from '../../lib/constants';
@@ -57,6 +61,12 @@ export default function EmployeeWorkspacePage() {
   const [actionError, setActionError] = useState<string>('');
   const [breakReason, setBreakReason] = useState<string>(BreakReason.LUNCH);
   const [activityViewTab, setActivityViewTab] = useState<'timeline' | 'logs'>('timeline');
+
+  // Full Work & Attendance History State
+  const [allHistorySessions, setAllHistorySessions] = useState<any[]>([]);
+  const [historyFilter, setHistoryFilter] = useState<'all' | 'today' | 'yesterday' | 'week' | 'month' | 'custom'>('all');
+  const [customHistoryDate, setCustomHistoryDate] = useState<string>('');
+  const [autoEndNotice, setAutoEndNotice] = useState<string>('');
 
   const [showInstallBanner, setShowInstallBanner] = useState(true);
   const [autoDownloaded, setAutoDownloaded] = useState(false);
@@ -204,12 +214,13 @@ export default function EmployeeWorkspacePage() {
     try {
       const today = getLocalDateString();
       const queryDate = selectedDate || today;
-      const [empRes, timelineRes, appRes, webRes, liveRes] = await Promise.all([
+      const [empRes, timelineRes, appRes, webRes, liveRes, attendanceRes] = await Promise.all([
         api.get(`/employees/${empId}`),
         api.get(`/activity/${empId}/timeline?date=${queryDate}`),
         api.get(`/applications/usage/${empId}?date=${queryDate}`),
         api.get(`/applications/websites/${empId}?date=${queryDate}`).catch(() => null),
-        api.get(`/employees/${empId}/live`).catch(() => null)
+        api.get(`/employees/${empId}/live`).catch(() => null),
+        api.get(`/attendance?limit=200`).catch(() => null)
       ]);
 
       if (empRes.data?.data) {
@@ -286,6 +297,10 @@ export default function EmployeeWorkspacePage() {
         ? webRes.data.data.websites
         : (empRes.data?.data?.topWebsites || []);
       setWebsiteUsages(sites);
+
+      if (attendanceRes?.data?.data && Array.isArray(attendanceRes.data.data)) {
+        setAllHistorySessions(attendanceRes.data.data);
+      }
     } catch (err) {
       console.error('[Employee] Fetch error:', err);
     }
@@ -562,8 +577,153 @@ const getBrowserAppName = (): string => {
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [sendHeartbeat, fetchMyData]);
 
+  const formatShiftDate = (dStr: string) => {
+    if (!dStr) return { formatted: '—', tag: '', itemDate: '' };
+    try {
+      const d = new Date(dStr);
+      const today = getLocalDateString();
+      const dYest = new Date();
+      dYest.setDate(dYest.getDate() - 1);
+      const yesterday = getLocalDateString(dYest);
+      const itemDate = getLocalDateString(d);
+
+      let tag = '';
+      if (itemDate === today) tag = 'Today';
+      else if (itemDate === yesterday) tag = 'Yesterday';
+
+      const formatted = d.toLocaleDateString(undefined, {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
+      });
+
+      return { formatted, tag, itemDate };
+    } catch {
+      return { formatted: dStr, tag: '', itemDate: '' };
+    }
+  };
+
+  const filteredHistory = React.useMemo(() => {
+    const today = getLocalDateString();
+    const dYest = new Date();
+    dYest.setDate(dYest.getDate() - 1);
+    const yesterday = getLocalDateString(dYest);
+    const weekAgo = new Date(Date.now() - 7 * 86400000);
+    const monthAgo = new Date(Date.now() - 30 * 86400000);
+
+    let list = [...allHistorySessions];
+
+    // If currently active work session is running, ensure it appears live at top
+    if (isWorking && currentSession?.startedAt) {
+      const alreadyPresent = list.some((s: any) => s._id === currentSession._id || (s.status === 'ACTIVE' && s.date === today));
+      if (!alreadyPresent) {
+        list.unshift({
+          _id: currentSession._id || 'live-current',
+          date: today,
+          startedAt: currentSession.startedAt,
+          endedAt: null,
+          durationSeconds: liveActiveSeconds + liveIdleSeconds + liveBreakSeconds,
+          activeSeconds: liveActiveSeconds,
+          idleSeconds: liveIdleSeconds,
+          breakSeconds: liveBreakSeconds,
+          status: 'ACTIVE',
+          endReason: 'Shift In Progress'
+        });
+      }
+    }
+
+    return list.filter((item: any) => {
+      const itemDate = item.date || (item.startedAt ? getLocalDateString(new Date(item.startedAt)) : '');
+      if (historyFilter === 'today') {
+        return itemDate === today;
+      }
+      if (historyFilter === 'yesterday') {
+        return itemDate === yesterday;
+      }
+      if (historyFilter === 'week') {
+        return item.startedAt && new Date(item.startedAt) >= weekAgo;
+      }
+      if (historyFilter === 'month') {
+        return item.startedAt && new Date(item.startedAt) >= monthAgo;
+      }
+      if (historyFilter === 'custom' && customHistoryDate) {
+        return itemDate === customHistoryDate;
+      }
+      return true; // 'all'
+    });
+  }, [allHistorySessions, historyFilter, customHistoryDate, isWorking, currentSession, liveActiveSeconds, liveIdleSeconds, liveBreakSeconds]);
+
+  const historyStats = React.useMemo(() => {
+    const totalShifts = filteredHistory.length;
+    let totalSec = 0;
+    let activeSec = 0;
+    let idleSec = 0;
+    let breakSec = 0;
+    let autoEndedCount = 0;
+
+    filteredHistory.forEach((s: any) => {
+      let dur = s.durationSeconds;
+      if (dur == null || dur <= 0) {
+        if (s.startedAt && s.endedAt) {
+          dur = Math.max(0, Math.round((new Date(s.endedAt).getTime() - new Date(s.startedAt).getTime()) / 1000));
+        } else if (s.startedAt && s.status === 'ACTIVE') {
+          dur = Math.max(0, Math.round((Date.now() - new Date(s.startedAt).getTime()) / 1000));
+        } else {
+          dur = (s.activeSeconds || 0) + (s.idleSeconds || 0) + (s.breakSeconds || 0);
+        }
+      }
+      totalSec += dur;
+      activeSec += (s.activeSeconds || 0);
+      idleSec += (s.idleSeconds || 0);
+      breakSec += (s.breakSeconds || 0);
+
+      const r = (s.endReason || '').toLowerCase();
+      if (r.includes('5:00 pm') || r.includes('5 pm') || r.includes('shift conclusion')) {
+        autoEndedCount++;
+      }
+    });
+
+    return { totalShifts, totalSec, activeSec, idleSec, breakSec, autoEndedCount };
+  }, [filteredHistory]);
+
+  // Check if today's shift has already been completed/ended
+  const hasCompletedShiftToday = Boolean(
+    !isWorking && (completedSessions.length > 0 || currentProfile?.todayAttendanceStatus === 'COMPLETED')
+  );
+
+  const [currentMinutes, setCurrentMinutes] = useState(() => {
+    const d = new Date();
+    return d.getHours() * 60 + d.getMinutes();
+  });
+
+  useEffect(() => {
+    const minTicker = setInterval(() => {
+      const d = new Date();
+      setCurrentMinutes(d.getHours() * 60 + d.getMinutes());
+    }, 10000);
+    return () => clearInterval(minTicker);
+  }, []);
+
+  const isBefore830AM = currentMinutes < (8 * 60 + 30);
+  const isPast5PM = currentMinutes >= (17 * 60);
+  const canStartWork = !isWorking && !hasCompletedShiftToday && !isBefore830AM && !isPast5PM;
+
   const handleStartWork = async () => {
     setActionError('');
+    if (hasCompletedShiftToday) {
+      setActionError('You have already completed your work session for today. Next work shift starts tomorrow at 8:30 AM.');
+      return;
+    }
+    if (isBefore830AM) {
+      setActionError('Work sessions can only be started from 8:30 AM onwards. Shift hours are 9:00 AM – 5:00 PM.');
+      return;
+    }
+    if (isPast5PM) {
+      setActionError('Today\'s work shift concluded at 5:00 PM. Next work session starts tomorrow at 8:30 AM.');
+      return;
+    }
+
     setLoading(true);
     // Optimistic UI update - start fresh at 0 for this new shift!
     const browserApp = getBrowserAppName();
@@ -665,6 +825,63 @@ const getBrowserAppName = (): string => {
       setLoading(false);
     }
   };
+
+  const handleAutoEndWorkAt5PM = useCallback(async () => {
+    if (!isWorkingRef.current) return;
+    console.log('[Auto-End] 5:00 PM shift end reached. Concluding session automatically.');
+
+    isWorkingRef.current = false;
+    isOnBreakRef.current = false;
+    setIsIdle(false);
+
+    setCurrentSession(null);
+    setCurrentProfile((prev: any) => ({
+      ...prev,
+      currentStatus: ActivityState.OFFLINE,
+      currentSessionId: undefined,
+      currentApplication: '',
+      todayAttendanceStatus: 'COMPLETED'
+    }));
+
+    setLiveActiveSeconds(0);
+    setLiveIdleSeconds(0);
+    setLiveBreakSeconds(0);
+    try {
+      localStorage.removeItem('highp_live_active_sec');
+      localStorage.removeItem('highp_live_idle_sec');
+      localStorage.removeItem('highp_live_break_sec');
+    } catch {}
+
+    setAutoEndNotice('Your work session has automatically ended at 5:00 PM (scheduled shift conclusion). Attendance and duration have been saved. Work starts manually at 9:00 AM.');
+
+    try {
+      await sendHeartbeat(ActivityState.OFFLINE, 1);
+      await api.post('/attendance/end', { endReason: 'Auto-ended at 5:00 PM (Shift Conclusion)' });
+      await fetchMyData();
+      await refreshAuth();
+    } catch (err: any) {
+      console.warn('[Auto-End] End work warning:', err);
+      await fetchMyData();
+    }
+  }, [sendHeartbeat, fetchMyData, refreshAuth]);
+
+  // Periodic 5:00 PM Shift Conclusion Check (Shift Hours: 9:00 AM - 5:00 PM)
+  useEffect(() => {
+    if (!isWorking) return;
+
+    const checkAutoEndAt5PM = () => {
+      const now = new Date();
+      const startIso = currentSession?.startedAt || currentProfile?.currentShiftStartedAt;
+      const startedBefore5PM = !startIso || (new Date(startIso).getHours() < 17);
+      if (now.getHours() >= 17 && startedBefore5PM && isWorkingRef.current) {
+        handleAutoEndWorkAt5PM();
+      }
+    };
+
+    checkAutoEndAt5PM();
+    const interval = setInterval(checkAutoEndAt5PM, 2000);
+    return () => clearInterval(interval);
+  }, [isWorking, currentSession?.startedAt, currentProfile?.currentShiftStartedAt, handleAutoEndWorkAt5PM]);
 
   const handleStartBreak = async () => {
     setActionError('');
@@ -810,6 +1027,27 @@ const getBrowserAppName = (): string => {
           </div>
         )}
 
+        {autoEndNotice && (
+          <div className="flex items-center justify-between p-4.5 rounded-2xl bg-indigo-50/95 border border-indigo-200 text-indigo-950 text-xs sm:text-sm font-semibold animate-fade-in shadow-xs">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-sm shadow-indigo-600/20">
+                <Clock className="w-5 h-5" />
+              </div>
+              <div>
+                <span className="font-extrabold block text-indigo-950 text-sm">Shift Concluded at 5:00 PM</span>
+                <span className="text-xs text-indigo-800 font-medium">{autoEndNotice}</span>
+              </div>
+            </div>
+            <button
+              onClick={() => setAutoEndNotice('')}
+              className="p-1.5 rounded-lg hover:bg-indigo-100 text-indigo-700 transition-colors shrink-0"
+              title="Dismiss notification"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
         {/* Desktop Agent Setup Banner */}
         {showInstallBanner && (
           <div className="bg-gradient-to-r from-indigo-50/90 via-sky-50/60 to-white border border-indigo-200/90 rounded-3xl p-6 sm:p-7 shadow-xs relative overflow-hidden">
@@ -860,7 +1098,7 @@ const getBrowserAppName = (): string => {
         <div className="bg-white border border-slate-200/90 rounded-3xl p-7 sm:p-9 shadow-sm relative overflow-hidden">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative z-10">
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
                   Current Attendance State
                 </span>
@@ -870,7 +1108,23 @@ const getBrowserAppName = (): string => {
                 </span>
               </div>
 
-              <h2 className="text-2xl sm:text-3xl font-black text-slate-900 mt-1.5 tracking-tight font-sans">
+              {/* Standard 9:00 AM - 5:00 PM Shift Policy Pills */}
+              <div className="flex items-center gap-2 mt-2 flex-wrap">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-slate-100 text-slate-800 border border-slate-200 shadow-2xs">
+                  <Clock className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                  Work Hours: 9:00 AM – 5:00 PM
+                </span>
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 shadow-2xs">
+                  <Play className="w-3 h-3 fill-current text-emerald-600 shrink-0" />
+                  Start: Manual Clock In
+                </span>
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-indigo-50 text-indigo-800 border border-indigo-200 shadow-2xs">
+                  <Square className="w-3 h-3 fill-current text-indigo-600 shrink-0" />
+                  End: Auto @ 5:00 PM
+                </span>
+              </div>
+
+              <h2 className="text-2xl sm:text-3xl font-black text-slate-900 mt-2.5 tracking-tight font-sans">
                 {isWorking ? (
                   isOnBreak ? (
                     <span className="text-amber-600 flex items-center gap-3">
@@ -906,8 +1160,12 @@ const getBrowserAppName = (): string => {
                   ? isOnBreak
                     ? 'You are on break. Click "Resume Work" when you return to your workstation.'
                     : 'Your session is recording active software time, idle intervals, and productivity metrics.'
-                  : completedSessions.length > 0
-                  ? 'Your work session has ended. Click Start Work below to begin a new session.'
+                  : hasCompletedShiftToday
+                  ? 'Your shift for today is complete. Next work session starts tomorrow from 8:30 AM.'
+                  : isBefore830AM
+                  ? 'Clock-in opens at 8:30 AM. Standard shift hours are 9:00 AM – 5:00 PM.'
+                  : isPast5PM
+                  ? 'Shift hours concluded at 5:00 PM. Your next work session unlocks tomorrow at 8:30 AM.'
                   : 'Click Start Work below to begin recording your work session and attendance.'}
               </p>
             </div>
@@ -915,14 +1173,47 @@ const getBrowserAppName = (): string => {
             {/* Main Action Buttons */}
             <div className="flex flex-col sm:flex-row sm:items-center gap-3 relative z-10 shrink-0 w-full lg:w-auto">
               {!isWorking ? (
-                <button
-                  onClick={handleStartWork}
-                  disabled={loading}
-                  className="w-full sm:w-auto justify-center flex items-center gap-2.5 px-8 py-3.5 sm:py-4 rounded-2xl bg-black hover:bg-slate-800 text-white font-black text-sm shadow-md transition-all hover:scale-105 active:scale-95 disabled:opacity-50 min-h-[48px]"
-                >
-                  <Play className="w-5 h-5 fill-current text-white shrink-0" />
-                  <span>Start Work</span>
-                </button>
+                <div className="flex flex-col sm:items-end gap-1.5 w-full sm:w-auto">
+                  <button
+                    onClick={handleStartWork}
+                    disabled={loading || !canStartWork}
+                    className={`w-full sm:w-auto justify-center flex items-center gap-2.5 px-8 py-3.5 sm:py-4 rounded-2xl font-black text-sm shadow-md transition-all min-h-[48px] ${
+                      canStartWork
+                        ? 'bg-black hover:bg-slate-800 text-white hover:scale-105 active:scale-95 cursor-pointer'
+                        : 'bg-slate-200 text-slate-500 cursor-not-allowed opacity-80 shadow-none'
+                    }`}
+                    title={
+                      hasCompletedShiftToday
+                        ? 'Shift completed for today. Next shift starts tomorrow at 8:30 AM.'
+                        : isBefore830AM
+                        ? 'Clock-in is enabled from 8:30 AM onwards.'
+                        : isPast5PM
+                        ? 'Shift ended at 5:00 PM. Next shift starts tomorrow at 8:30 AM.'
+                        : 'Click to start recording your work session'
+                    }
+                  >
+                    <Play className={`w-5 h-5 fill-current shrink-0 ${canStartWork ? 'text-white' : 'text-slate-400'}`} />
+                    <span>
+                      {hasCompletedShiftToday
+                        ? 'Shift Completed Today'
+                        : isBefore830AM
+                        ? 'Clock-In Opens @ 8:30 AM'
+                        : isPast5PM
+                        ? 'Shift Concluded @ 5:00 PM'
+                        : 'Start Work'}
+                    </span>
+                  </button>
+
+                  {!canStartWork && (
+                    <span className="text-[11px] font-bold text-slate-500 text-center sm:text-right">
+                      {hasCompletedShiftToday
+                        ? 'Next shift starts tomorrow at 8:30 AM'
+                        : isBefore830AM
+                        ? 'Enabled at 8:30 AM (Shift: 9 AM – 5 PM)'
+                        : 'Shift concluded for today at 5:00 PM'}
+                    </span>
+                  )}
+                </div>
               ) : (
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3 w-full sm:w-auto">
                   {!isOnBreak ? (
@@ -1223,66 +1514,426 @@ const getBrowserAppName = (): string => {
           );
         })()}
 
-        {/* Today's Completed Attendance History */}
-        {completedSessions.length > 0 && (
-          <div className="bg-white border border-slate-200/90 rounded-3xl p-6 sm:p-7 shadow-sm">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-100 flex-wrap gap-2">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-200/60 flex items-center justify-center">
-                  <History className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-black text-slate-900">Today's Completed Work Sessions</h3>
-                  <p className="text-[11px] text-slate-500 font-medium">Authoritative attendance sessions recorded for today</p>
-                </div>
+        {/* Full Work & Shift Attendance History Component */}
+        <div className="bg-white border border-slate-200/90 rounded-3xl p-5 sm:p-7 shadow-sm space-y-6">
+          {/* Header & Filter Controls Bar */}
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-5 border-b border-slate-100">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-600 border border-indigo-200/70 flex items-center justify-center shrink-0 shadow-2xs">
+                <History className="w-5 h-5 text-indigo-600" />
               </div>
-              <span className="text-xs font-bold px-3 py-1 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
-                {completedSessions.length} Completed Session{completedSessions.length === 1 ? '' : 's'}
-              </span>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
+                    My Full Attendance & Work History
+                  </h3>
+                  <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
+                    {filteredHistory.length} Record{filteredHistory.length === 1 ? '' : 's'}
+                  </span>
+                  {isWorking && (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                      Live Shift Active
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-slate-500 font-medium mt-0.5">
+                  Complete records of started work times, clock-out times, durations, active work, and shift status
+                </p>
+              </div>
             </div>
 
-            <div className="mt-4 overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead>
-                  <tr className="border-b border-slate-100 text-slate-400 uppercase text-[10px] font-bold tracking-wider">
-                    <th className="pb-3 pr-4 font-extrabold">#</th>
-                    <th className="pb-3 px-4 font-extrabold">Clock In</th>
-                    <th className="pb-3 px-4 font-extrabold">Clock Out</th>
-                    <th className="pb-3 px-4 font-extrabold">Work Duration</th>
-                    <th className="pb-3 px-4 font-extrabold text-emerald-700">Active Work</th>
-                    <th className="pb-3 px-4 font-extrabold text-amber-700">Idle Time</th>
-                    <th className="pb-3 px-4 font-extrabold text-indigo-700">Breaks</th>
-                    <th className="pb-3 pl-4 font-extrabold text-right">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {completedSessions.map((sess: any, idx: number) => {
-                    const startStr = sess.startedAt ? new Date(sess.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
-                    const endStr = sess.endedAt ? new Date(sess.endedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
-                    const dur = sess.durationSeconds != null ? formatDuration(sess.durationSeconds) : '0m';
-                    return (
-                      <tr key={sess._id || idx} className="hover:bg-slate-50/60 transition-colors">
-                        <td className="py-3.5 pr-4 font-bold text-slate-500">Session {idx + 1}</td>
-                        <td className="py-3.5 px-4 font-mono font-bold text-slate-800">{startStr}</td>
-                        <td className="py-3.5 px-4 font-mono font-bold text-slate-800">{endStr}</td>
-                        <td className="py-3.5 px-4 font-mono font-bold text-indigo-700">{dur}</td>
-                        <td className="py-3.5 px-4 font-mono font-bold text-emerald-600">{formatDuration(sess.activeSeconds || 0)}</td>
-                        <td className="py-3.5 px-4 font-mono font-bold text-amber-600">{formatDuration(sess.idleSeconds || 0)}</td>
-                        <td className="py-3.5 px-4 font-mono font-bold text-indigo-600">{formatDuration(sess.breakSeconds || 0)}</td>
-                        <td className="py-3.5 pl-4 text-right">
-                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+            {/* Quick Filter Controls & Date Picker */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center bg-slate-100 p-0.5 rounded-xl border border-slate-200 text-xs font-bold overflow-x-auto max-w-full">
+                <button
+                  type="button"
+                  onClick={() => setHistoryFilter('all')}
+                  className={`px-3 py-1.5 rounded-lg transition-all whitespace-nowrap ${
+                    historyFilter === 'all'
+                      ? 'bg-white text-indigo-700 shadow-2xs font-black'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  All History
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setHistoryFilter('today')}
+                  className={`px-3 py-1.5 rounded-lg transition-all whitespace-nowrap ${
+                    historyFilter === 'today'
+                      ? 'bg-white text-indigo-700 shadow-2xs font-black'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Today
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setHistoryFilter('yesterday')}
+                  className={`px-3 py-1.5 rounded-lg transition-all whitespace-nowrap ${
+                    historyFilter === 'yesterday'
+                      ? 'bg-white text-indigo-700 shadow-2xs font-black'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Yesterday
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setHistoryFilter('week')}
+                  className={`px-3 py-1.5 rounded-lg transition-all whitespace-nowrap ${
+                    historyFilter === 'week'
+                      ? 'bg-white text-indigo-700 shadow-2xs font-black'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Past 7 Days
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setHistoryFilter('month')}
+                  className={`px-3 py-1.5 rounded-lg transition-all whitespace-nowrap ${
+                    historyFilter === 'month'
+                      ? 'bg-white text-indigo-700 shadow-2xs font-black'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  This Month
+                </button>
+              </div>
+
+              {/* Specific Date Picker */}
+              <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1">
+                <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                <input
+                  type="date"
+                  value={customHistoryDate}
+                  onChange={(e) => {
+                    setCustomHistoryDate(e.target.value);
+                    if (e.target.value) setHistoryFilter('custom');
+                  }}
+                  className="bg-transparent text-xs font-semibold text-slate-800 focus:outline-none"
+                  title="Filter by specific date"
+                />
+                {customHistoryDate && (
+                  <button
+                    onClick={() => {
+                      setCustomHistoryDate('');
+                      setHistoryFilter('all');
+                    }}
+                    className="text-slate-400 hover:text-slate-600 p-0.5"
+                    title="Clear date filter"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Aggregated Filter Summary Chips */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="bg-slate-50/80 p-3 sm:p-3.5 rounded-2xl border border-slate-200/80">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                Shifts Recorded
+              </span>
+              <span className="text-lg sm:text-xl font-black text-slate-900 mt-0.5 block font-sans">
+                {historyStats.totalShifts}
+              </span>
+            </div>
+            <div className="bg-slate-50/80 p-3 sm:p-3.5 rounded-2xl border border-slate-200/80">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                Total Work Duration
+              </span>
+              <span className="text-lg sm:text-xl font-black text-indigo-700 mt-0.5 block font-mono">
+                {formatDuration(historyStats.totalSec)}
+              </span>
+            </div>
+            <div className="bg-slate-50/80 p-3 sm:p-3.5 rounded-2xl border border-slate-200/80">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                Productive Active Time
+              </span>
+              <span className="text-lg sm:text-xl font-black text-emerald-600 mt-0.5 block font-mono">
+                {formatDuration(historyStats.activeSec)}
+              </span>
+            </div>
+            <div className="bg-slate-50/80 p-3 sm:p-3.5 rounded-2xl border border-slate-200/80">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                Auto-Ended @ 5:00 PM
+              </span>
+              <span className="text-lg sm:text-xl font-black text-slate-800 mt-0.5 block font-sans">
+                {historyStats.autoEndedCount} Shift{historyStats.autoEndedCount === 1 ? '' : 's'}
+              </span>
+            </div>
+          </div>
+
+          {filteredHistory.length === 0 ? (
+            <div className="text-center py-12 px-4 bg-slate-50/60 rounded-2xl border border-slate-200/70">
+              <History className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+              <p className="text-sm font-bold text-slate-700">No shift history found for this view</p>
+              <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+                {historyFilter === 'yesterday'
+                  ? 'No attendance records logged for yesterday.'
+                  : historyFilter === 'today'
+                  ? 'No shifts recorded for today yet. Click "Start Work" above to begin your day.'
+                  : 'Start a manual work session to record attendance.'}
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setHistoryFilter('all');
+                  setCustomHistoryDate('');
+                }}
+                className="mt-3.5 inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-indigo-600 shadow-2xs hover:bg-slate-50"
+              >
+                Reset Filter to All
+              </button>
+            </div>
+          ) : (
+            <>
+              {/* Mobile View: High-Density Card List (< 768px) */}
+              <div className="block md:hidden space-y-3.5">
+                {filteredHistory.map((sess: any, idx: number) => {
+                  const dateInfo = formatShiftDate(sess.startedAt || sess.date);
+                  const startStr = sess.startedAt
+                    ? new Date(sess.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                    : '—';
+                  const isLive = sess.status === 'ACTIVE' || !sess.endedAt;
+                  const endStr = isLive
+                    ? 'Working Now (Live)'
+                    : sess.endedAt
+                    ? new Date(sess.endedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                    : '—';
+
+                  let durSec = sess.durationSeconds;
+                  if (durSec == null || durSec <= 0) {
+                    if (sess.startedAt && sess.endedAt) {
+                      durSec = Math.max(0, Math.round((new Date(sess.endedAt).getTime() - new Date(sess.startedAt).getTime()) / 1000));
+                    } else if (sess.startedAt && isLive) {
+                      durSec = Math.max(0, Math.round((Date.now() - new Date(sess.startedAt).getTime()) / 1000));
+                    } else {
+                      durSec = (sess.activeSeconds || 0) + (sess.idleSeconds || 0) + (sess.breakSeconds || 0);
+                    }
+                  }
+
+                  const is5PMEnd = (sess.endReason || '').toLowerCase().includes('5:00 pm') ||
+                    (sess.endReason || '').toLowerCase().includes('5 pm') ||
+                    (sess.endReason || '').toLowerCase().includes('shift conclusion');
+
+                  return (
+                    <div
+                      key={sess._id || idx}
+                      className="p-4 rounded-2xl border border-slate-200/90 bg-slate-50/50 hover:bg-white hover:shadow-sm transition-all space-y-3"
+                    >
+                      {/* Card Header: Date & Status */}
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-xs font-black text-slate-900">{dateInfo.formatted}</span>
+                          {dateInfo.tag && (
+                            <span
+                              className={`text-[10px] font-extrabold px-2 py-0.5 rounded-md ${
+                                dateInfo.tag === 'Today'
+                                  ? 'bg-indigo-100 text-indigo-800 border border-indigo-200'
+                                  : 'bg-slate-200 text-slate-700'
+                              }`}
+                            >
+                              {dateInfo.tag}
+                            </span>
+                          )}
+                        </div>
+
+                        {isLive ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                            Live Now
+                          </span>
+                        ) : is5PMEnd ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 shrink-0">
+                            <CheckCircle2 className="w-3 h-3 text-indigo-600" />
+                            Auto-Ended @ 5 PM
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
                             <CheckCircle2 className="w-3 h-3 text-emerald-600" />
                             Completed
                           </span>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
+                        )}
+                      </div>
+
+                      {/* Work Timing Arrow Bar */}
+                      <div className="p-3 bg-white rounded-xl border border-slate-200/80 flex items-center justify-between gap-3 shadow-2xs">
+                        <div className="min-w-0">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                            Clock In (Start)
+                          </span>
+                          <span className="font-mono font-black text-slate-900 text-sm">{startStr}</span>
+                        </div>
+
+                        <ArrowRight className="w-4 h-4 text-slate-400 shrink-0" />
+
+                        <div className="min-w-0 text-right">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                            Clock Out (End)
+                          </span>
+                          <span className={`font-mono font-black text-sm ${isLive ? 'text-emerald-600' : 'text-slate-900'}`}>
+                            {endStr}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Duration & Breakdown Pills */}
+                      <div className="flex items-center justify-between gap-2 pt-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                            Total Shift:
+                          </span>
+                          <span className="font-mono font-black text-indigo-700 text-xs bg-indigo-50 px-2 py-0.5 rounded-lg border border-indigo-100">
+                            {formatDuration(durSec)}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 text-[11px] font-mono font-bold">
+                          <span className="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100" title="Active Productive Time">
+                            {formatDuration(sess.activeSeconds || 0)}
+                          </span>
+                          <span className="text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-100" title="Idle Time">
+                            {formatDuration(sess.idleSeconds || 0)}
+                          </span>
+                          <span className="text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100" title="Breaks">
+                            {formatDuration(sess.breakSeconds || 0)}
+                          </span>
+                        </div>
+                      </div>
+
+                      {sess.endReason && (
+                        <div className="text-[10px] text-slate-500 italic pt-1 border-t border-slate-100">
+                          Note: {sess.endReason}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Tablet & Desktop View: High-Density Structured Table (>= 768px) */}
+              <div className="hidden md:block overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="border-b border-slate-100 text-slate-400 uppercase text-[10px] font-bold tracking-wider">
+                      <th className="pb-3 pr-3 font-extrabold">Date / Day</th>
+                      <th className="pb-3 px-3 font-extrabold">Clock In (Start)</th>
+                      <th className="pb-3 px-3 font-extrabold">Clock Out (End)</th>
+                      <th className="pb-3 px-3 font-extrabold text-indigo-700">Total Duration</th>
+                      <th className="pb-3 px-3 font-extrabold text-emerald-700">Active Work</th>
+                      <th className="pb-3 px-3 font-extrabold text-amber-700">Idle Time</th>
+                      <th className="pb-3 px-3 font-extrabold text-indigo-700">Breaks</th>
+                      <th className="pb-3 pl-3 font-extrabold text-right">Shift Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {filteredHistory.map((sess: any, idx: number) => {
+                      const dateInfo = formatShiftDate(sess.startedAt || sess.date);
+                      const startStr = sess.startedAt
+                        ? new Date(sess.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                        : '—';
+                      const isLive = sess.status === 'ACTIVE' || !sess.endedAt;
+                      const endStr = isLive
+                        ? 'Working Now (Live)'
+                        : sess.endedAt
+                        ? new Date(sess.endedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                        : '—';
+
+                      let durSec = sess.durationSeconds;
+                      if (durSec == null || durSec <= 0) {
+                        if (sess.startedAt && sess.endedAt) {
+                          durSec = Math.max(0, Math.round((new Date(sess.endedAt).getTime() - new Date(sess.startedAt).getTime()) / 1000));
+                        } else if (sess.startedAt && isLive) {
+                          durSec = Math.max(0, Math.round((Date.now() - new Date(sess.startedAt).getTime()) / 1000));
+                        } else {
+                          durSec = (sess.activeSeconds || 0) + (sess.idleSeconds || 0) + (sess.breakSeconds || 0);
+                        }
+                      }
+
+                      const is5PMEnd = (sess.endReason || '').toLowerCase().includes('5:00 pm') ||
+                        (sess.endReason || '').toLowerCase().includes('5 pm') ||
+                        (sess.endReason || '').toLowerCase().includes('shift conclusion');
+
+                      return (
+                        <tr key={sess._id || idx} className="hover:bg-slate-50/70 transition-colors">
+                          <td className="py-3.5 pr-3 font-bold text-slate-900 whitespace-nowrap">
+                            <div className="flex items-center gap-1.5">
+                              <span>{dateInfo.formatted}</span>
+                              {dateInfo.tag && (
+                                <span
+                                  className={`text-[9px] font-black px-1.5 py-0.5 rounded ${
+                                    dateInfo.tag === 'Today'
+                                      ? 'bg-indigo-100 text-indigo-800 border border-indigo-200'
+                                      : 'bg-slate-200 text-slate-700'
+                                  }`}
+                                >
+                                  {dateInfo.tag}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="py-3.5 px-3 font-mono font-bold text-slate-800 whitespace-nowrap">
+                            <span className="inline-flex items-center gap-1.5">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                              {startStr}
+                            </span>
+                          </td>
+                          <td className="py-3.5 px-3 font-mono font-bold whitespace-nowrap">
+                            <span className="inline-flex items-center gap-1.5">
+                              <span className={`w-1.5 h-1.5 rounded-full ${isLive ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`} />
+                              <span className={isLive ? 'text-emerald-700' : 'text-slate-800'}>{endStr}</span>
+                            </span>
+                          </td>
+                          <td className="py-3.5 px-3 font-mono font-bold text-indigo-700 whitespace-nowrap">
+                            {formatDuration(durSec)}
+                          </td>
+                          <td className="py-3.5 px-3 font-mono font-bold text-emerald-600 whitespace-nowrap">
+                            {formatDuration(sess.activeSeconds || 0)}
+                          </td>
+                          <td className="py-3.5 px-3 font-mono font-bold text-amber-600 whitespace-nowrap">
+                            {formatDuration(sess.idleSeconds || 0)}
+                          </td>
+                          <td className="py-3.5 px-3 font-mono font-bold text-indigo-600 whitespace-nowrap">
+                            {formatDuration(sess.breakSeconds || 0)}
+                          </td>
+                          <td className="py-3.5 pl-3 text-right whitespace-nowrap">
+                            {isLive ? (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                Working Now
+                              </span>
+                            ) : is5PMEnd ? (
+                              <span
+                                className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200"
+                                title={sess.endReason || 'Shift concluded at 5:00 PM'}
+                              >
+                                <CheckCircle2 className="w-3 h-3 text-indigo-600" />
+                                Auto-Ended @ 5 PM
+                              </span>
+                            ) : (
+                              <span
+                                className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                title={sess.endReason || 'Completed session'}
+                              >
+                                <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                Completed
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+        </div>
 
         {/* 2-Column Section: Timeline & Software / Website Tracking */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8">
