@@ -27,7 +27,15 @@ import {
   Percent,
   X,
   RefreshCw,
-  Coins
+  Coins,
+  Sliders,
+  Plus,
+  Minus,
+  ToggleLeft,
+  ToggleRight,
+  HelpCircle,
+  Check,
+  Info
 } from 'lucide-react';
 import { PayrollSummary, PayrollEmployeeItem, PayrollDailyEntry } from '@highp/shared';
 
@@ -56,14 +64,22 @@ export default function PayrollDashboardPage() {
     dailyBreakdown: PayrollDailyEntry[];
   } | null>(null);
 
-  // Edit rate modal state
+  // Edit rate and overtime modal state
   const [editingEmp, setEditingEmp] = useState<PayrollEmployeeItem | null>(null);
   const [editRateValue, setEditRateValue] = useState<number>(25);
   const [editCurrency, setEditCurrency] = useState<string>('INR');
   const [editOtMultiplier, setEditOtMultiplier] = useState<number>(1.5);
   const [editStdHours, setEditStdHours] = useState<number>(8);
+  const [editOtRateMode, setEditOtRateMode] = useState<'MULTIPLIER' | 'FIXED'>('MULTIPLIER');
+  const [editOtFixedRate, setEditOtFixedRate] = useState<number>(0);
+  const [editOtEnabled, setEditOtEnabled] = useState<boolean>(true);
+  const [editCustomOtPayment, setEditCustomOtPayment] = useState<number>(0);
+  const [editBonus, setEditBonus] = useState<number>(0);
+  const [editDeductions, setEditDeductions] = useState<number>(0);
+  const [editPayrollNotes, setEditPayrollNotes] = useState<string>('');
   const [isSavingRate, setIsSavingRate] = useState<boolean>(false);
   const [rateSuccessMsg, setRateSuccessMsg] = useState<string>('');
+  const [editModalTab, setEditModalTab] = useState<'overtime' | 'base' | 'adjustments'>('overtime');
 
   // Calculate default dates according to dateFilter
   const calculateDates = useCallback((filter: DateFilterType) => {
@@ -163,11 +179,23 @@ export default function PayrollDashboardPage() {
 
   const handleOpenEditRate = (emp: PayrollEmployeeItem) => {
     setEditingEmp(emp);
-    setEditRateValue(emp.hourlyRate || 25);
+    setEditRateValue(emp.hourlyRate != null ? emp.hourlyRate : 25);
     setEditCurrency(emp.currency || 'INR');
-    setEditOtMultiplier(emp.overtimeMultiplier || 1.5);
-    setEditStdHours(emp.standardDailyHours || 8);
+    setEditOtMultiplier(emp.overtimeMultiplier != null ? emp.overtimeMultiplier : 1.5);
+    setEditStdHours(emp.standardDailyHours != null ? emp.standardDailyHours : 8);
+    setEditOtRateMode(emp.overtimeRateMode === 'FIXED' ? 'FIXED' : 'MULTIPLIER');
+    setEditOtFixedRate(
+      emp.overtimeFixedRate != null && emp.overtimeFixedRate > 0
+        ? emp.overtimeFixedRate
+        : Math.round((emp.hourlyRate || 25) * (emp.overtimeMultiplier || 1.5) * 100) / 100
+    );
+    setEditOtEnabled(emp.overtimeEnabled !== false);
+    setEditCustomOtPayment(emp.customOvertimePayment || 0);
+    setEditBonus(emp.bonus || 0);
+    setEditDeductions(emp.deductions || 0);
+    setEditPayrollNotes(emp.payrollNotes || '');
     setRateSuccessMsg('');
+    setEditModalTab('overtime');
   };
 
   const handleSaveRate = async () => {
@@ -179,15 +207,27 @@ export default function PayrollDashboardPage() {
         hourlyRate: editRateValue,
         currency: editCurrency,
         overtimeMultiplier: editOtMultiplier,
-        standardDailyHours: editStdHours
+        standardDailyHours: editStdHours,
+        overtimeRateMode: editOtRateMode,
+        overtimeFixedRate: editOtFixedRate,
+        overtimeEnabled: editOtEnabled,
+        customOvertimePayment: editCustomOtPayment,
+        bonus: editBonus,
+        deductions: editDeductions,
+        payrollNotes: editPayrollNotes
       });
-      setRateSuccessMsg('Wage updated successfully!');
+      setRateSuccessMsg('Payroll and overtime settings saved successfully!');
+
+      if (selectedEmpId === editingEmp.employeeId) {
+        handleOpenPayslip(editingEmp.employeeId);
+      }
+
       setTimeout(() => {
         setEditingEmp(null);
         fetchPayroll();
       }, 700);
     } catch (err: any) {
-      alert(err?.response?.data?.message || 'Failed to update rate');
+      alert(err?.response?.data?.message || 'Failed to update payroll details');
     } finally {
       setIsSavingRate(false);
     }
@@ -398,28 +438,29 @@ export default function PayrollDashboardPage() {
 
       {/* KPI Metric Overview Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Total Gross Payroll */}
+        {/* Total Net Take-Home Payroll */}
         <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-xs relative overflow-hidden">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-              Total Gross Payroll
+              Total Net Payout
             </span>
-            <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+            <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold text-sm">
               {currencySymbol}
             </div>
           </div>
           <div className="mt-2">
             <span className="text-3xl font-black text-slate-900 tracking-tight">
               {currencySymbol}
-              {payrollData ? payrollData.totalGrossPay.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00'}
+              {payrollData ? (payrollData.totalNetPay ?? payrollData.totalGrossPay).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00'}
             </span>
           </div>
-          <div className="mt-2 flex items-center gap-1.5 text-[11px] font-semibold text-slate-500">
-            <span>Includes regular wages & overtime</span>
+          <div className="mt-2 flex items-center justify-between text-[11px] font-semibold text-slate-500">
+            <span>Gross: {currencySymbol}{payrollData ? payrollData.totalGrossPay.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00'}</span>
+            <span className="text-emerald-600 font-bold">Take-home</span>
           </div>
         </div>
 
-        {/* Total Billable Hours */}
+        {/* Total Paid Hours */}
         <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-xs relative overflow-hidden">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
@@ -445,7 +486,7 @@ export default function PayrollDashboardPage() {
         <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-xs relative overflow-hidden">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-              Overtime Pay (1.5x)
+              Overtime Compensation
             </span>
             <div className="w-8 h-8 rounded-xl bg-violet-50 text-violet-600 flex items-center justify-center">
               <TrendingUp className="w-4 h-4" />
@@ -457,31 +498,33 @@ export default function PayrollDashboardPage() {
               {payrollData ? payrollData.totalOvertimePay.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00'}
             </span>
           </div>
-          <div className="mt-2 flex items-center gap-1.5 text-[11px] font-semibold text-slate-500">
-            <span>{payrollData ? payrollData.totalOvertimeHours.toFixed(1) : 0} overtime hrs accrued</span>
+          <div className="mt-2 flex items-center justify-between text-[11px] font-semibold text-slate-500">
+            <span>{payrollData ? payrollData.totalOvertimeHours.toFixed(1) : 0} overtime hrs logged</span>
+            <span className="text-violet-600 font-bold">OT Premium</span>
           </div>
         </div>
 
-        {/* Idle Time Impact */}
+        {/* Bonus & Deductions / Idle Impact */}
         <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-xs relative overflow-hidden">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-              Idle Inactivity Cost
+              Incentives & Deductions
             </span>
             <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
-              <Coffee className="w-4 h-4" />
+              <Coins className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-2">
-            <span className="text-3xl font-black text-amber-600 tracking-tight">
-              {payrollData ? payrollData.totalIdleHours.toFixed(1) : '0.0'} <span className="text-base font-bold text-amber-400">hrs</span>
+            <span className="text-2xl font-black text-slate-900 tracking-tight">
+              <span className="text-emerald-600">+{currencySymbol}{payrollData ? (payrollData.totalBonus || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 }) : '0'}</span>
+              <span className="text-slate-300 mx-1.5">/</span>
+              <span className="text-rose-600">-{currencySymbol}{payrollData ? (payrollData.totalDeductions || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 }) : '0'}</span>
             </span>
           </div>
           <div className="mt-2 flex items-center gap-1.5 text-[11px] font-semibold text-slate-500">
             <span>
-              {payIdleTime
-                ? 'Status: Paid during shift'
-                : 'Status: Deducted from salary'}
+              Net Adj: {((payrollData?.totalBonus || 0) - (payrollData?.totalDeductions || 0)) >= 0 ? '+' : ''}
+              {currencySymbol}{((payrollData?.totalBonus || 0) - (payrollData?.totalDeductions || 0)).toFixed(2)}
             </span>
           </div>
         </div>
@@ -511,13 +554,13 @@ export default function PayrollDashboardPage() {
             <thead>
               <tr className="bg-slate-50/70 border-b border-slate-100 text-slate-400 uppercase text-[10px] font-bold tracking-wider">
                 <th className="py-3.5 pl-6 pr-3 font-extrabold">Employee</th>
-                <th className="py-3.5 px-3 font-extrabold">Hourly Rate</th>
+                <th className="py-3.5 px-3 font-extrabold">Base Wage & OT Mode</th>
                 <th className="py-3.5 px-3 font-extrabold text-emerald-700">Active Work</th>
-                <th className="py-3.5 px-3 font-extrabold text-amber-700">Idle Time</th>
                 <th className="py-3.5 px-3 font-extrabold text-indigo-700">Paid Hours</th>
                 <th className="py-3.5 px-3 font-extrabold">Regular Pay</th>
                 <th className="py-3.5 px-3 font-extrabold text-violet-700">Overtime</th>
-                <th className="py-3.5 px-3 font-extrabold text-slate-900">Gross Salary</th>
+                <th className="py-3.5 px-3 font-extrabold text-amber-700">Bonus / Ded.</th>
+                <th className="py-3.5 px-3 font-extrabold text-slate-900">Net Salary</th>
                 <th className="py-3.5 pl-3 pr-6 font-extrabold text-right">Actions</th>
               </tr>
             </thead>
@@ -526,7 +569,7 @@ export default function PayrollDashboardPage() {
                 <tr>
                   <td colSpan={9} className="py-12 text-center text-slate-400 font-semibold">
                     <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-indigo-500" />
-                    Calculating payroll and hourly wages...
+                    Calculating payroll and overtime compensation...
                   </td>
                 </tr>
               ) : filteredEmployees.length === 0 ? (
@@ -537,6 +580,13 @@ export default function PayrollDashboardPage() {
                 </tr>
               ) : (
                 filteredEmployees.map((emp) => {
+                  const effectiveOtRate = emp.effectiveOtRate ?? (
+                    emp.overtimeRateMode === 'FIXED'
+                      ? (emp.overtimeFixedRate || 0)
+                      : emp.hourlyRate * (emp.overtimeMultiplier || 1.5)
+                  );
+                  const netPay = emp.netPay ?? (emp.grossPay + (emp.bonus || 0) - (emp.deductions || 0));
+
                   return (
                     <tr key={emp.employeeId} className="hover:bg-slate-50/80 transition-colors">
                       {/* Employee Info */}
@@ -552,39 +602,49 @@ export default function PayrollDashboardPage() {
                             <div className="flex items-center gap-1.5 text-[11px] text-slate-400">
                               <span className="font-mono text-slate-500">{emp.employeeCode}</span>
                               <span>•</span>
-                              <span>{emp.department || 'General'}</span>
+                              <span>{emp.designation || emp.department || 'Staff'}</span>
                             </div>
                           </div>
                         </div>
                       </td>
 
-                      {/* Hourly Rate */}
+                      {/* Hourly Rate & OT Mode */}
                       <td className="py-4 px-3 font-mono">
-                        <button
-                          onClick={() => handleOpenEditRate(emp)}
-                          className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-100 hover:bg-indigo-50 hover:text-indigo-600 text-slate-700 font-bold transition-all text-xs"
-                          title="Click to edit rate"
-                        >
-                          <span>{currencySymbol}{emp.hourlyRate.toFixed(2)}/h</span>
-                          <Edit2 className="w-3 h-3 text-slate-400" />
-                        </button>
+                        <div className="flex flex-col gap-1 items-start">
+                          <button
+                            onClick={() => handleOpenEditRate(emp)}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-slate-100 hover:bg-indigo-50 hover:text-indigo-600 text-slate-800 font-bold transition-all text-xs"
+                            title="Click to edit rate & overtime"
+                          >
+                            <span>{currencySymbol}{emp.hourlyRate.toFixed(2)}/h</span>
+                            <Edit2 className="w-2.5 h-2.5 text-slate-400" />
+                          </button>
+                          <div>
+                            {emp.overtimeEnabled === false ? (
+                              <span className="text-[10px] text-slate-400 font-bold bg-slate-100 px-1.5 py-0.5 rounded">
+                                OT Disabled
+                              </span>
+                            ) : emp.overtimeRateMode === 'FIXED' ? (
+                              <span className="text-[10px] text-violet-700 font-bold bg-violet-50 px-1.5 py-0.5 rounded">
+                                Fixed {currencySymbol}{emp.overtimeFixedRate || 0}/h OT
+                              </span>
+                            ) : (
+                              <span className="text-[10px] text-indigo-700 font-bold bg-indigo-50 px-1.5 py-0.5 rounded">
+                                {emp.overtimeMultiplier || 1.5}x ({currencySymbol}{effectiveOtRate.toFixed(1)}/h)
+                              </span>
+                            )}
+                          </div>
+                        </div>
                       </td>
 
                       {/* Active Work Time */}
                       <td className="py-4 px-3 font-mono font-bold text-emerald-600">
                         {formatDuration(emp.activeSeconds)}
-                      </td>
-
-                      {/* Idle Time */}
-                      <td className="py-4 px-3 font-mono">
-                        <span className={`inline-flex items-center gap-1 font-bold ${emp.idleSeconds > 0 ? 'text-amber-600' : 'text-slate-400'}`}>
-                          {formatDuration(emp.idleSeconds)}
-                          {payIdleTime && emp.idleSeconds > 0 && (
-                            <span className="text-[10px] text-emerald-600 font-semibold bg-emerald-50 px-1.5 py-0.2 rounded-sm border border-emerald-200">
-                              Paid
-                            </span>
-                          )}
-                        </span>
+                        {emp.idleSeconds > 0 && (
+                          <span className="block text-[10px] text-amber-600 font-normal">
+                            +{formatDuration(emp.idleSeconds)} idle
+                          </span>
+                        )}
                       </td>
 
                       {/* Total Billable Hours */}
@@ -599,38 +659,74 @@ export default function PayrollDashboardPage() {
                       <td className="py-4 px-3 font-mono font-bold text-slate-700">
                         {currencySymbol}{emp.regularPay.toFixed(2)}
                         <span className="block text-[10px] text-slate-400 font-normal">
-                          {emp.regularHours.toFixed(1)}h @ standard
+                          {emp.regularHours.toFixed(1)}h regular
                         </span>
                       </td>
 
                       {/* Overtime Pay */}
                       <td className="py-4 px-3 font-mono font-bold text-violet-700">
-                        {emp.overtimeHours > 0 ? (
+                        {(emp.overtimeHours > 0 || (emp.customOvertimePayment && emp.customOvertimePayment > 0)) ? (
                           <>
-                            {currencySymbol}{emp.overtimePay.toFixed(2)}
-                            <span className="block text-[10px] text-violet-500 font-normal">
-                              +{emp.overtimeHours.toFixed(1)}h ({emp.overtimeMultiplier}x)
-                            </span>
+                            <div>{currencySymbol}{emp.overtimePay.toFixed(2)}</div>
+                            <div className="text-[10px] text-violet-500 font-normal">
+                              +{emp.overtimeHours.toFixed(1)}h logged
+                              {emp.customOvertimePayment ? ` (+${currencySymbol}${emp.customOvertimePayment} adj)` : ''}
+                            </div>
                           </>
                         ) : (
                           <span className="text-slate-400">—</span>
                         )}
                       </td>
 
-                      {/* Gross Salary */}
-                      <td className="py-4 px-3 font-mono text-sm font-black text-slate-900">
-                        {currencySymbol}{emp.grossPay.toFixed(2)}
+                      {/* Bonus / Deductions */}
+                      <td className="py-4 px-3 font-mono text-xs">
+                        {((emp.bonus || 0) > 0 || (emp.deductions || 0) > 0) ? (
+                          <div className="space-y-0.5">
+                            {(emp.bonus || 0) > 0 && (
+                              <div className="text-emerald-600 font-bold text-[11px]">
+                                +{currencySymbol}{(emp.bonus || 0).toFixed(2)}
+                              </div>
+                            )}
+                            {(emp.deductions || 0) > 0 && (
+                              <div className="text-rose-600 font-bold text-[11px]">
+                                -{currencySymbol}{(emp.deductions || 0).toFixed(2)}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-slate-400">—</span>
+                        )}
+                      </td>
+
+                      {/* Net Salary */}
+                      <td className="py-4 px-3 font-mono">
+                        <div className="text-sm font-black text-slate-900">
+                          {currencySymbol}{netPay.toFixed(2)}
+                        </div>
+                        {((emp.bonus || 0) > 0 || (emp.deductions || 0) > 0) && (
+                          <div className="text-[10px] text-slate-400 font-normal">
+                            Gross: {currencySymbol}{emp.grossPay.toFixed(2)}
+                          </div>
+                        )}
                       </td>
 
                       {/* Actions */}
                       <td className="py-4 pl-3 pr-6 text-right">
                         <div className="flex items-center justify-end gap-1.5">
                           <button
+                            onClick={() => handleOpenEditRate(emp)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-violet-50 hover:bg-violet-100 text-violet-700 font-extrabold text-xs transition-colors"
+                            title="Edit Hourly Rate, Overtime & Adjustments"
+                          >
+                            <Sliders className="w-3.5 h-3.5" />
+                            <span>Edit Pay</span>
+                          </button>
+                          <button
                             onClick={() => handleOpenPayslip(emp.employeeId)}
-                            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-extrabold text-xs transition-colors"
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-extrabold text-xs transition-colors"
                           >
                             <FileText className="w-3.5 h-3.5" />
-                            Payslip
+                            <span>Payslip</span>
                           </button>
                         </div>
                       </td>
@@ -663,6 +759,17 @@ export default function PayrollDashboardPage() {
                 </div>
               </div>
               <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    const currentEmp = payrollData?.items.find((i) => i.employeeId === selectedEmpId);
+                    if (currentEmp) handleOpenEditRate(currentEmp);
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-violet-50 hover:bg-violet-100 text-violet-700 font-bold text-xs transition-colors"
+                  title="Edit Overtime & Payroll Settings"
+                >
+                  <Sliders className="w-3.5 h-3.5" />
+                  <span>Edit Pay & OT</span>
+                </button>
                 <button
                   onClick={() => window.print()}
                   className="p-2 rounded-xl text-slate-500 hover:text-slate-800 hover:bg-slate-200/60 transition-colors"
@@ -710,55 +817,89 @@ export default function PayrollDashboardPage() {
                         {empDetailData.summary.designation || 'Staff'}
                       </span>
                       <span className="text-xs text-slate-500">
-                        {empDetailData.summary.department}
+                        {empDetailData.summary.department || 'General'}
                       </span>
                     </div>
 
                     <div>
                       <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-                        Base Hourly Rate
+                        Base Wage & OT Rate
                       </span>
                       <span className="font-mono font-extrabold text-indigo-700 text-sm mt-0.5 block">
                         {currencySymbol}{empDetailData.summary.hourlyRate.toFixed(2)}/hr
                       </span>
-                      <span className="text-[11px] text-slate-500">
-                        OT Multiplier: {empDetailData.summary.overtimeMultiplier}x
+                      <span className="text-[11px] text-violet-600 font-semibold block">
+                        {empDetailData.summary.overtimeEnabled === false ? (
+                          'OT Disabled'
+                        ) : empDetailData.summary.overtimeRateMode === 'FIXED' ? (
+                          `OT: Fixed ${currencySymbol}${empDetailData.summary.overtimeFixedRate || 0}/hr`
+                        ) : (
+                          `OT: ${empDetailData.summary.overtimeMultiplier || 1.5}x (${currencySymbol}${(empDetailData.summary.effectiveOtRate || empDetailData.summary.hourlyRate * (empDetailData.summary.overtimeMultiplier || 1.5)).toFixed(2)}/hr)`
+                        )}
                       </span>
                     </div>
 
                     <div>
                       <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-                        Total Gross Earnings
+                        Net Take-Home Salary
                       </span>
                       <span className="font-mono font-black text-emerald-600 text-base mt-0.5 block">
-                        {currencySymbol}{empDetailData.summary.grossPay.toFixed(2)}
+                        {currencySymbol}{(empDetailData.summary.netPay ?? empDetailData.summary.grossPay).toFixed(2)}
                       </span>
                       <span className="text-[11px] text-slate-500">
-                        {empDetailData.summary.totalHours.toFixed(1)} Billable Hours
+                        Gross: {currencySymbol}{empDetailData.summary.grossPay.toFixed(2)}
                       </span>
                     </div>
                   </div>
 
                   {/* Earnings Calculation Breakdown Box */}
-                  <div className="bg-indigo-50/70 border border-indigo-100 rounded-2xl p-4.5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <div>
-                      <h4 className="text-xs font-black uppercase tracking-wider text-indigo-900">
-                        Compensation Calculation Formula
-                      </h4>
-                      <p className="text-xs text-indigo-700/80 mt-0.5">
-                        Regular Hours ({empDetailData.summary.regularHours}h @ {currencySymbol}{empDetailData.summary.hourlyRate}/h) + Overtime ({empDetailData.summary.overtimeHours}h @ {currencySymbol}{(empDetailData.summary.hourlyRate * empDetailData.summary.overtimeMultiplier).toFixed(2)}/h)
-                      </p>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <div className="text-xs text-slate-600">
-                        Regular: <span className="font-mono font-bold text-slate-900">{currencySymbol}{empDetailData.summary.regularPay.toFixed(2)}</span>
+                  <div className="bg-gradient-to-r from-indigo-50/80 to-violet-50/80 border border-indigo-100 rounded-2xl p-4.5 space-y-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div>
+                        <h4 className="text-xs font-black uppercase tracking-wider text-indigo-900 flex items-center gap-1.5">
+                          <Sliders className="w-3.5 h-3.5 text-indigo-600" />
+                          Compensation Breakdown
+                        </h4>
+                        <p className="text-xs text-indigo-700/90 mt-0.5">
+                          Standard Shift Threshold: {empDetailData.summary.standardDailyHours || 8}h/day
+                        </p>
                       </div>
-                      {empDetailData.summary.overtimePay > 0 && (
-                        <div className="text-xs text-violet-700 font-semibold">
-                          Overtime: <span className="font-mono font-bold">+{currencySymbol}{empDetailData.summary.overtimePay.toFixed(2)}</span>
+                      <div className="text-right shrink-0 font-mono space-y-0.5">
+                        <div className="text-xs text-slate-700">
+                          Regular Pay: <span className="font-bold text-slate-900">{currencySymbol}{empDetailData.summary.regularPay.toFixed(2)}</span>
+                          <span className="text-[10px] text-slate-400 ml-1">({empDetailData.summary.regularHours.toFixed(1)}h)</span>
                         </div>
-                      )}
+                        <div className="text-xs text-violet-700 font-semibold">
+                          Overtime Pay: <span className="font-bold">+{currencySymbol}{empDetailData.summary.overtimePay.toFixed(2)}</span>
+                          <span className="text-[10px] text-violet-500 ml-1">({empDetailData.summary.overtimeHours.toFixed(1)}h)</span>
+                        </div>
+                        {(empDetailData.summary.customOvertimePayment || 0) > 0 && (
+                          <div className="text-[11px] text-violet-600 font-medium">
+                            Manual OT Adj: +{currencySymbol}{(empDetailData.summary.customOvertimePayment || 0).toFixed(2)}
+                          </div>
+                        )}
+                        {(empDetailData.summary.bonus || 0) > 0 && (
+                          <div className="text-xs text-emerald-600 font-bold">
+                            Bonus / Incentive: +{currencySymbol}{(empDetailData.summary.bonus || 0).toFixed(2)}
+                          </div>
+                        )}
+                        {(empDetailData.summary.deductions || 0) > 0 && (
+                          <div className="text-xs text-rose-600 font-bold">
+                            Deductions: -{currencySymbol}{(empDetailData.summary.deductions || 0).toFixed(2)}
+                          </div>
+                        )}
+                      </div>
                     </div>
+
+                    {empDetailData.summary.payrollNotes && (
+                      <div className="pt-2 border-t border-indigo-100/60 text-xs text-indigo-950 flex items-start gap-1.5">
+                        <Info className="w-3.5 h-3.5 shrink-0 text-indigo-600 mt-0.5" />
+                        <div>
+                          <span className="font-bold">Payroll Notes: </span>
+                          <span>{empDetailData.summary.payrollNotes}</span>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Daily Itemized Breakdown Table */}
@@ -830,106 +971,414 @@ export default function PayrollDashboardPage() {
         </div>
       )}
 
-      {/* EDIT HOURLY RATE MODAL */}
+      {/* COMPREHENSIVE EDIT PAYROLL & OVERTIME MODAL */}
       {editingEmp && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-slate-200 overflow-hidden">
-            <div className="p-6 border-b border-slate-100 flex items-center justify-between">
-              <div>
-                <h3 className="text-base font-black text-slate-900">
-                  Update Hourly Rate
-                </h3>
-                <p className="text-xs text-slate-500 font-medium">
-                  {editingEmp.name} ({editingEmp.employeeCode})
-                </p>
+          <div className="bg-white rounded-3xl max-w-2xl w-full shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[92vh]">
+            {/* Modal Header */}
+            <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-indigo-600 to-violet-600 text-white flex items-center justify-center font-black shadow-md shadow-indigo-500/20">
+                  <Sliders className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-900">
+                    Edit Payroll & Overtime Settings
+                  </h3>
+                  <p className="text-xs text-slate-500 font-medium">
+                    {editingEmp.name} • <span className="font-mono">{editingEmp.employeeCode}</span> • {editingEmp.designation || editingEmp.department || 'Staff'}
+                  </p>
+                </div>
               </div>
               <button
                 onClick={() => setEditingEmp(null)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 transition-colors"
+                className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-200/50 transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="p-6 space-y-4">
-              <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1">
-                  Hourly Rate ({currencySymbol} / hour)
-                </label>
-                <div className="relative">
-                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-bold text-slate-400 text-sm">
-                    {currencySymbol}
+            {/* Modal Tabs Navigation */}
+            <div className="px-6 pt-3 border-b border-slate-100 flex items-center gap-2 bg-white">
+              <button
+                onClick={() => setEditModalTab('overtime')}
+                className={`pb-3 px-3 text-xs font-extrabold border-b-2 flex items-center gap-1.5 transition-all ${
+                  editModalTab === 'overtime'
+                    ? 'border-indigo-600 text-indigo-600'
+                    : 'border-transparent text-slate-400 hover:text-slate-700'
+                }`}
+              >
+                <TrendingUp className="w-3.5 h-3.5" />
+                <span>Overtime Settings</span>
+              </button>
+              <button
+                onClick={() => setEditModalTab('base')}
+                className={`pb-3 px-3 text-xs font-extrabold border-b-2 flex items-center gap-1.5 transition-all ${
+                  editModalTab === 'base'
+                    ? 'border-indigo-600 text-indigo-600'
+                    : 'border-transparent text-slate-400 hover:text-slate-700'
+                }`}
+              >
+                <Clock className="w-3.5 h-3.5" />
+                <span>Base Wage & Shifts</span>
+              </button>
+              <button
+                onClick={() => setEditModalTab('adjustments')}
+                className={`pb-3 px-3 text-xs font-extrabold border-b-2 flex items-center gap-1.5 transition-all ${
+                  editModalTab === 'adjustments'
+                    ? 'border-indigo-600 text-indigo-600'
+                    : 'border-transparent text-slate-400 hover:text-slate-700'
+                }`}
+              >
+                <Coins className="w-3.5 h-3.5" />
+                <span>Bonuses & Deductions</span>
+              </button>
+            </div>
+
+            {/* Modal Content Body */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-5">
+              {/* TAB 1: OVERTIME SETTINGS */}
+              {editModalTab === 'overtime' && (
+                <div className="space-y-4">
+                  {/* Overtime Toggle */}
+                  <div className="p-4 rounded-2xl border border-slate-200 bg-slate-50/60 flex items-center justify-between">
+                    <div>
+                      <span className="text-xs font-black text-slate-900 block">
+                        Enable Overtime Calculation
+                      </span>
+                      <p className="text-[11px] text-slate-500 font-medium">
+                        When enabled, hours exceeding standard shift duration will receive overtime payment.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setEditOtEnabled(!editOtEnabled)}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                        editOtEnabled ? 'bg-indigo-600' : 'bg-slate-300'
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                          editOtEnabled ? 'translate-x-6' : 'translate-x-1'
+                        }`}
+                      />
+                    </button>
+                  </div>
+
+                  {editOtEnabled && (
+                    <>
+                      {/* Overtime Calculation Mode Selector */}
+                      <div>
+                        <label className="text-xs font-bold text-slate-700 block mb-2">
+                          Overtime Rate Calculation Mode
+                        </label>
+                        <div className="grid grid-cols-2 gap-3">
+                          <button
+                            type="button"
+                            onClick={() => setEditOtRateMode('MULTIPLIER')}
+                            className={`p-3.5 rounded-2xl border text-left transition-all ${
+                              editOtRateMode === 'MULTIPLIER'
+                                ? 'border-indigo-600 bg-indigo-50/60 ring-2 ring-indigo-600/20'
+                                : 'border-slate-200 hover:border-slate-300 bg-white'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-xs font-black text-slate-900">Multiplier Mode</span>
+                              {editOtRateMode === 'MULTIPLIER' && (
+                                <CheckCircle2 className="w-4 h-4 text-indigo-600" />
+                              )}
+                            </div>
+                            <p className="text-[11px] text-slate-500">
+                              Based on standard hourly rate multiplier (e.g., 1.5x, 2.0x base wage)
+                            </p>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setEditOtRateMode('FIXED')}
+                            className={`p-3.5 rounded-2xl border text-left transition-all ${
+                              editOtRateMode === 'FIXED'
+                                ? 'border-indigo-600 bg-indigo-50/60 ring-2 ring-indigo-600/20'
+                                : 'border-slate-200 hover:border-slate-300 bg-white'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-xs font-black text-slate-900">Custom Fixed Rate</span>
+                              {editOtRateMode === 'FIXED' && (
+                                <CheckCircle2 className="w-4 h-4 text-indigo-600" />
+                              )}
+                            </div>
+                            <p className="text-[11px] text-slate-500">
+                              Set a dedicated fixed payment amount per overtime hour
+                            </p>
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Mode Specific Inputs */}
+                      {editOtRateMode === 'MULTIPLIER' ? (
+                        <div className="space-y-2">
+                          <label className="text-xs font-bold text-slate-700 block">
+                            Overtime Multiplier
+                          </label>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="number"
+                              step="0.1"
+                              min="1"
+                              max="4"
+                              value={editOtMultiplier}
+                              onChange={(e) => setEditOtMultiplier(parseFloat(e.target.value) || 1.5)}
+                              className="w-32 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:border-indigo-500"
+                            />
+                            <div className="flex items-center gap-1.5">
+                              {[1.25, 1.5, 1.75, 2.0].map((m) => (
+                                <button
+                                  key={m}
+                                  type="button"
+                                  onClick={() => setEditOtMultiplier(m)}
+                                  className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                                    editOtMultiplier === m
+                                      ? 'bg-indigo-600 text-white'
+                                      : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                                  }`}
+                                >
+                                  {m}x
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                          <p className="text-[11px] text-slate-400">
+                            Effective Overtime Rate: <span className="font-bold text-violet-700">{currencySymbol}{(editRateValue * editOtMultiplier).toFixed(2)}/hr</span>
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-bold text-slate-700 block">
+                            Fixed Overtime Hourly Rate ({currencySymbol} / hour)
+                          </label>
+                          <div className="relative">
+                            <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-bold text-slate-400 text-xs">
+                              {currencySymbol}
+                            </span>
+                            <input
+                              type="number"
+                              step="1"
+                              min="0"
+                              value={editOtFixedRate}
+                              onChange={(e) => setEditOtFixedRate(parseFloat(e.target.value) || 0)}
+                              className="w-full pl-8 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:border-indigo-500"
+                              placeholder="e.g. 250"
+                            />
+                          </div>
+                          <p className="text-[11px] text-slate-400">
+                            This fixed amount will be applied to every hour worked beyond the daily threshold.
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Threshold shift hours and manual overtime adjustments */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                        <div>
+                          <label className="text-xs font-bold text-slate-700 block mb-1">
+                            Shift Threshold (Hours/day)
+                          </label>
+                          <input
+                            type="number"
+                            step="0.5"
+                            min="1"
+                            max="24"
+                            value={editStdHours}
+                            onChange={(e) => setEditStdHours(parseFloat(e.target.value) || 8)}
+                            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:border-indigo-500"
+                          />
+                          <p className="text-[10px] text-slate-400 mt-1">
+                            Hours worked past this limit per day count as OT.
+                          </p>
+                        </div>
+
+                        <div>
+                          <label className="text-xs font-bold text-slate-700 block mb-1">
+                            Manual OT Adjustment ({currencySymbol})
+                          </label>
+                          <div className="relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 font-bold text-slate-400 text-xs">
+                              {currencySymbol}
+                            </span>
+                            <input
+                              type="number"
+                              step="10"
+                              min="0"
+                              value={editCustomOtPayment}
+                              onChange={(e) => setEditCustomOtPayment(parseFloat(e.target.value) || 0)}
+                              className="w-full pl-7 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:border-indigo-500"
+                              placeholder="0"
+                            />
+                          </div>
+                          <p className="text-[10px] text-slate-400 mt-1">
+                            Direct flat addition to overtime payment.
+                          </p>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* TAB 2: BASE WAGE & SHIFTS */}
+              {editModalTab === 'base' && (
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-xs font-bold text-slate-700 block mb-1">
+                      Standard Hourly Base Rate ({currencySymbol} / hour)
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-bold text-slate-400 text-sm">
+                        {currencySymbol}
+                      </span>
+                      <input
+                        type="number"
+                        step="0.5"
+                        min="0"
+                        value={editRateValue}
+                        onChange={(e) => setEditRateValue(parseFloat(e.target.value) || 0)}
+                        className="w-full pl-8 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 focus:outline-none focus:border-indigo-500"
+                      />
+                    </div>
+                    <p className="text-[11px] text-slate-400 mt-1">
+                      Wages calculated for active/billable work within standard shift hours.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-slate-700 block mb-1">
+                      Currency
+                    </label>
+                    <select
+                      value={editCurrency}
+                      onChange={(e) => setEditCurrency(e.target.value)}
+                      className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:border-indigo-500"
+                    >
+                      <option value="INR">INR (₹) - Indian Rupee (Default)</option>
+                      <option value="USD">USD ($) - US Dollar</option>
+                      <option value="EUR">EUR (€) - Euro</option>
+                      <option value="GBP">GBP (£) - British Pound</option>
+                      <option value="AED">AED (د.إ) - UAE Dirham</option>
+                      <option value="CAD">CAD ($) - Canadian Dollar</option>
+                      <option value="AUD">AUD ($) - Australian Dollar</option>
+                    </select>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 3: BONUSES, DEDUCTIONS & NOTES */}
+              {editModalTab === 'adjustments' && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs font-bold text-emerald-800 block mb-1">
+                        Performance Bonus / Allowance ({currencySymbol})
+                      </label>
+                      <div className="relative">
+                        <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-bold text-emerald-500 text-xs">
+                          +{currencySymbol}
+                        </span>
+                        <input
+                          type="number"
+                          step="10"
+                          min="0"
+                          value={editBonus}
+                          onChange={(e) => setEditBonus(parseFloat(e.target.value) || 0)}
+                          className="w-full pl-8 pr-3 py-2 bg-emerald-50/50 border border-emerald-200 rounded-xl text-xs font-bold text-emerald-950 focus:outline-none focus:border-emerald-500"
+                          placeholder="0"
+                        />
+                      </div>
+                      <p className="text-[10px] text-slate-400 mt-1">
+                        Added to employee gross salary.
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-bold text-rose-800 block mb-1">
+                        Salary Deductions / Advance ({currencySymbol})
+                      </label>
+                      <div className="relative">
+                        <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-bold text-rose-500 text-xs">
+                          -{currencySymbol}
+                        </span>
+                        <input
+                          type="number"
+                          step="10"
+                          min="0"
+                          value={editDeductions}
+                          onChange={(e) => setEditDeductions(parseFloat(e.target.value) || 0)}
+                          className="w-full pl-8 pr-3 py-2 bg-rose-50/50 border border-rose-200 rounded-xl text-xs font-bold text-rose-950 focus:outline-none focus:border-rose-500"
+                          placeholder="0"
+                        />
+                      </div>
+                      <p className="text-[10px] text-slate-400 mt-1">
+                        Deducted from final net payout.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-slate-700 block mb-1">
+                      Payroll Remarks & Notes
+                    </label>
+                    <textarea
+                      rows={3}
+                      value={editPayrollNotes}
+                      onChange={(e) => setEditPayrollNotes(e.target.value)}
+                      placeholder="e.g., Overtime approved by Lead, festival bonus included, etc."
+                      className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* LIVE CALCULATION PREVIEW BOX */}
+              <div className="p-4 rounded-2xl bg-gradient-to-tr from-slate-900 to-indigo-950 text-white shadow-lg space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-300 flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+                    Live Calculation Preview
                   </span>
-                  <input
-                    type="number"
-                    step="0.5"
-                    min="0"
-                    value={editRateValue}
-                    onChange={(e) => setEditRateValue(parseFloat(e.target.value) || 0)}
-                    className="w-full pl-8 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 focus:outline-none focus:border-indigo-500"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-bold text-slate-700 block mb-1">
-                    Currency
-                  </label>
-                  <select
-                    value={editCurrency}
-                    onChange={(e) => setEditCurrency(e.target.value)}
-                    className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:border-indigo-500"
-                  >
-                    <option value="INR">INR (₹) - Indian Rupee</option>
-                    <option value="USD">USD ($)</option>
-                    <option value="EUR">EUR (€)</option>
-                    <option value="GBP">GBP (£)</option>
-                    <option value="CAD">CAD ($)</option>
-                    <option value="AUD">AUD ($)</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-xs font-bold text-slate-700 block mb-1">
-                    OT Multiplier
-                  </label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    min="1"
-                    max="3"
-                    value={editOtMultiplier}
-                    onChange={(e) => setEditOtMultiplier(parseFloat(e.target.value) || 1.5)}
-                    className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:border-indigo-500"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1">
-                  Standard Daily Shift Hours (Threshold before OT)
-                </label>
-                <input
-                  type="number"
-                  step="0.5"
-                  min="1"
-                  max="24"
-                  value={editStdHours}
-                  onChange={(e) => setEditStdHours(parseFloat(e.target.value) || 8)}
-                  className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:border-indigo-500"
-                />
-              </div>
-
-              <div className="p-3 rounded-xl bg-violet-50/70 border border-violet-200/80 text-xs">
-                <div className="flex items-center justify-between text-violet-900 font-bold mb-1">
-                  <span>Overtime Pay Rate</span>
-                  <span className="font-mono text-sm text-violet-700">
-                    {currencySymbol}{(editRateValue * editOtMultiplier).toFixed(2)}/hr
+                  <span className="text-xs font-mono font-bold text-emerald-400">
+                    Active Formula
                   </span>
                 </div>
-                <p className="text-[11px] text-violet-600 font-medium">
-                  Hours exceeding {editStdHours}h per day are billed at {editOtMultiplier}x standard wage.
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs pt-1 border-t border-white/10 font-mono">
+                  <div>
+                    <span className="text-[10px] text-slate-400 block font-sans">Base Rate</span>
+                    <span className="font-bold text-white">{currencySymbol}{editRateValue.toFixed(2)}/h</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-400 block font-sans">OT Rate</span>
+                    <span className="font-bold text-violet-300">
+                      {!editOtEnabled
+                        ? 'Disabled'
+                        : editOtRateMode === 'FIXED'
+                        ? `${currencySymbol}${editOtFixedRate.toFixed(2)}/h`
+                        : `${currencySymbol}${(editRateValue * editOtMultiplier).toFixed(2)}/h`}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-400 block font-sans">Shift Limit</span>
+                    <span className="font-bold text-indigo-300">{editStdHours}h/day</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-400 block font-sans">Net Adjustments</span>
+                    <span className="font-bold text-emerald-300">
+                      {((editBonus + editCustomOtPayment) - editDeductions) >= 0 ? '+' : ''}
+                      {currencySymbol}{((editBonus + editCustomOtPayment) - editDeductions).toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+
+                <p className="text-[10px] text-slate-400 font-sans border-t border-white/10 pt-2">
+                  Sample 10-hour shift payout: Standard 8h ({currencySymbol}{(editRateValue * 8).toFixed(2)}) + 2h OT ({currencySymbol}{(!editOtEnabled ? 0 : (editOtRateMode === 'FIXED' ? editOtFixedRate * 2 : (editRateValue * editOtMultiplier) * 2)).toFixed(2)}) + Adj ({currencySymbol}{((editBonus + editCustomOtPayment) - editDeductions).toFixed(2)}) = <span className="text-emerald-400 font-bold">{currencySymbol}{((editRateValue * 8) + (!editOtEnabled ? 0 : (editOtRateMode === 'FIXED' ? editOtFixedRate * 2 : (editRateValue * editOtMultiplier) * 2)) + (editBonus + editCustomOtPayment) - editDeductions).toFixed(2)}</span>
                 </p>
               </div>
 
@@ -941,22 +1390,38 @@ export default function PayrollDashboardPage() {
               )}
             </div>
 
-            <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-2.5">
-              <button
-                type="button"
-                onClick={() => setEditingEmp(null)}
-                className="px-4 py-2 rounded-xl text-xs font-bold bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleSaveRate}
-                disabled={isSavingRate}
-                className="px-5 py-2 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-600/20 transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
-              >
-                {isSavingRate ? 'Saving...' : 'Save Rate'}
-              </button>
+            {/* Modal Footer */}
+            <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
+              <span className="text-xs text-slate-400">
+                All changes update immediately and re-calculate historical totals.
+              </span>
+              <div className="flex items-center gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setEditingEmp(null)}
+                  className="px-4 py-2 rounded-xl text-xs font-bold bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveRate}
+                  disabled={isSavingRate}
+                  className="px-5 py-2 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-600/20 transition-all hover:scale-105 active:scale-95 disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  {isSavingRate ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Saving Changes...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-3.5 h-3.5" />
+                      <span>Save & Apply Settings</span>
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </div>
