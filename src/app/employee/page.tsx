@@ -1159,8 +1159,8 @@ const getBrowserAppName = (): string => {
         {/* Real-Time Hourly Salary & Accrued Earnings Card */}
         {(() => {
           const rate = currentProfile?.hourlyRate ?? 25;
-          const curr = currentProfile?.currency || 'USD';
-          const sym = curr === 'EUR' ? '€' : curr === 'GBP' ? '£' : curr === 'INR' ? '₹' : '$';
+          const curr = currentProfile?.currency || 'INR';
+          const sym = curr === 'USD' ? '$' : curr === 'EUR' ? '€' : curr === 'GBP' ? '£' : '₹';
           const otMult = currentProfile?.overtimeMultiplier ?? 1.5;
           const stdDailyHrs = currentProfile?.standardDailyHours ?? 8;
 

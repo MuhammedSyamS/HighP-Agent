@@ -19,7 +19,8 @@ import {
   X,
   RefreshCw,
   Briefcase,
-  DollarSign,
+  IndianRupee,
+  Coins,
   TrendingUp,
   Clock,
   Shield,
@@ -97,7 +98,7 @@ export default function EmployeesManagementPage() {
     department: 'Engineering & Development',
     systemRole: UserRole.EMPLOYEE,
     hourlyRate: 25,
-    currency: 'USD',
+    currency: 'INR',
     overtimeMultiplier: 1.5,
     standardDailyHours: 8
   });
@@ -116,7 +117,7 @@ export default function EmployeesManagementPage() {
     department: '',
     systemRole: UserRole.EMPLOYEE,
     hourlyRate: 25,
-    currency: 'USD',
+    currency: 'INR',
     overtimeMultiplier: 1.5,
     standardDailyHours: 8,
     status: 'ACTIVE'
@@ -181,7 +182,7 @@ export default function EmployeesManagementPage() {
       department: 'Engineering & Development',
       systemRole: UserRole.EMPLOYEE,
       hourlyRate: 25,
-      currency: 'USD',
+      currency: 'INR',
       overtimeMultiplier: 1.5,
       standardDailyHours: 8
     });
@@ -241,7 +242,7 @@ export default function EmployeesManagementPage() {
       department: emp.department || '',
       systemRole: emp.userId?.role || UserRole.EMPLOYEE,
       hourlyRate: emp.hourlyRate != null ? emp.hourlyRate : 25,
-      currency: emp.currency || 'USD',
+      currency: emp.currency || 'INR',
       overtimeMultiplier: emp.overtimeMultiplier != null ? emp.overtimeMultiplier : 1.5,
       standardDailyHours: emp.standardDailyHours != null ? emp.standardDailyHours : 8,
       status: emp.userId?.status || 'ACTIVE'
@@ -466,12 +467,12 @@ export default function EmployeesManagementPage() {
               Avg Hourly Wage
             </span>
             <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
-              <DollarSign className="w-4 h-4" />
+              <IndianRupee className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-2">
             <span className="text-3xl font-black text-slate-900 tracking-tight">
-              ${avgHourlyRate.toFixed(2)}
+              ₹{avgHourlyRate.toFixed(2)}
               <span className="text-sm font-bold text-slate-400">/hr</span>
             </span>
           </div>
@@ -601,7 +602,7 @@ export default function EmployeesManagementPage() {
                   const rate = emp.hourlyRate != null ? emp.hourlyRate : 25;
                   const otMult = emp.overtimeMultiplier != null ? emp.overtimeMultiplier : 1.5;
                   const stdHours = emp.standardDailyHours != null ? emp.standardDailyHours : 8;
-                  const curr = emp.currency || 'USD';
+                  const curr = emp.currency || 'INR';
 
                   return (
                     <tr key={emp._id} className="hover:bg-slate-50/80 transition-colors">
@@ -657,10 +658,10 @@ export default function EmployeesManagementPage() {
                       {/* Compensation & Overtime */}
                       <td className="py-4 px-3 font-mono">
                         <div className="font-bold text-slate-900 text-xs">
-                          ${rate.toFixed(2)}/h
+                          ₹{rate.toFixed(2)}/h
                         </div>
                         <div className="text-[10px] text-violet-600 font-bold">
-                          {otMult}x OT (${(rate * otMult).toFixed(2)}/h after {stdHours}h)
+                          {otMult}x OT (₹{(rate * otMult).toFixed(2)}/h after {stdHours}h)
                         </div>
                       </td>
 
@@ -884,7 +885,7 @@ export default function EmployeesManagementPage() {
 
                 <div className="grid grid-cols-3 gap-2.5">
                   <div>
-                    <label className="font-bold text-slate-600 block mb-1">Hourly Rate ($)</label>
+                    <label className="font-bold text-slate-600 block mb-1">Hourly Rate (₹)</label>
                     <input
                       type="number"
                       step="0.5"
@@ -929,7 +930,7 @@ export default function EmployeesManagementPage() {
                 <div className="p-2.5 rounded-xl bg-violet-50 text-violet-800 text-[11px] font-semibold flex items-center justify-between">
                   <span>Calculated Overtime Pay Rate:</span>
                   <span className="font-mono font-bold text-violet-900">
-                    ${(addForm.hourlyRate * addForm.overtimeMultiplier).toFixed(2)}/hr (after {addForm.standardDailyHours}h)
+                    ₹{(addForm.hourlyRate * addForm.overtimeMultiplier).toFixed(2)}/hr (after {addForm.standardDailyHours}h)
                   </span>
                 </div>
               </div>
@@ -1112,7 +1113,7 @@ export default function EmployeesManagementPage() {
 
                 <div className="grid grid-cols-3 gap-2.5">
                   <div>
-                    <label className="font-bold text-slate-600 block mb-1">Hourly Rate ($)</label>
+                    <label className="font-bold text-slate-600 block mb-1">Hourly Rate (₹)</label>
                     <input
                       type="number"
                       step="0.5"
@@ -1157,7 +1158,7 @@ export default function EmployeesManagementPage() {
                 <div className="p-2.5 rounded-xl bg-violet-50 text-violet-800 text-[11px] font-semibold flex items-center justify-between">
                   <span>Calculated Overtime Pay Rate:</span>
                   <span className="font-mono font-bold text-violet-900">
-                    ${(editForm.hourlyRate * editForm.overtimeMultiplier).toFixed(2)}/hr (after {editForm.standardDailyHours}h)
+                    ₹{(editForm.hourlyRate * editForm.overtimeMultiplier).toFixed(2)}/hr (after {editForm.standardDailyHours}h)
                   </span>
                 </div>
               </div>

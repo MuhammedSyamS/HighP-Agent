@@ -58,7 +58,7 @@ export default function PayrollDashboardPage() {
   // Edit rate modal state
   const [editingEmp, setEditingEmp] = useState<PayrollEmployeeItem | null>(null);
   const [editRateValue, setEditRateValue] = useState<number>(25);
-  const [editCurrency, setEditCurrency] = useState<string>('USD');
+  const [editCurrency, setEditCurrency] = useState<string>('INR');
   const [editOtMultiplier, setEditOtMultiplier] = useState<number>(1.5);
   const [editStdHours, setEditStdHours] = useState<number>(8);
   const [isSavingRate, setIsSavingRate] = useState<boolean>(false);
@@ -152,7 +152,7 @@ export default function PayrollDashboardPage() {
   const handleOpenEditRate = (emp: PayrollEmployeeItem) => {
     setEditingEmp(emp);
     setEditRateValue(emp.hourlyRate || 25);
-    setEditCurrency(emp.currency || 'USD');
+    setEditCurrency(emp.currency || 'INR');
     setEditOtMultiplier(emp.overtimeMultiplier || 1.5);
     setEditStdHours(emp.standardDailyHours || 8);
     setRateSuccessMsg('');
@@ -217,12 +217,12 @@ export default function PayrollDashboardPage() {
   }, [payrollData, searchQuery, departmentFilter]);
 
   const currencySymbol = useMemo(() => {
-    const c = payrollData?.currency || 'USD';
+    const c = payrollData?.currency || 'INR';
     if (c === 'EUR') return '€';
     if (c === 'GBP') return '£';
-    if (c === 'INR') return '₹';
+    if (c === 'USD') return '$';
     if (c === 'CAD' || c === 'AUD') return '$';
-    return '$';
+    return '₹';
   }, [payrollData?.currency]);
 
   return (
@@ -842,7 +842,7 @@ export default function PayrollDashboardPage() {
             <div className="p-6 space-y-4">
               <div>
                 <label className="text-xs font-bold text-slate-700 block mb-1">
-                  Hourly Rate ($ / hour)
+                  Hourly Rate ({currencySymbol} / hour)
                 </label>
                 <div className="relative">
                   <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-bold text-slate-400 text-sm">
@@ -869,10 +869,10 @@ export default function PayrollDashboardPage() {
                     onChange={(e) => setEditCurrency(e.target.value)}
                     className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:border-indigo-500"
                   >
+                    <option value="INR">INR (₹) - Indian Rupee</option>
                     <option value="USD">USD ($)</option>
                     <option value="EUR">EUR (€)</option>
                     <option value="GBP">GBP (£)</option>
-                    <option value="INR">INR (₹)</option>
                     <option value="CAD">CAD ($)</option>
                     <option value="AUD">AUD ($)</option>
                   </select>
