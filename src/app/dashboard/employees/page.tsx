@@ -64,6 +64,10 @@ interface EmployeeRecord {
   currency?: string;
   overtimeMultiplier?: number;
   standardDailyHours?: number;
+  overtimeRateMode?: 'MULTIPLIER' | 'FIXED';
+  overtimeFixedRate?: number;
+  overtimeEnabled?: boolean;
+  paymentStatus?: 'PENDING' | 'APPROVED' | 'PAID';
   currentStatus: ActivityState;
   currentApplication?: string;
   todayActiveSeconds?: number;
@@ -101,7 +105,10 @@ export default function EmployeesManagementPage() {
     hourlyRate: 25,
     currency: 'INR',
     overtimeMultiplier: 1.5,
-    standardDailyHours: 8
+    standardDailyHours: 8,
+    overtimeRateMode: 'MULTIPLIER' as 'MULTIPLIER' | 'FIXED',
+    overtimeFixedRate: 0,
+    overtimeEnabled: true
   });
   const [isAdding, setIsAdding] = useState<boolean>(false);
   const [addError, setAddError] = useState<string>('');
@@ -121,6 +128,9 @@ export default function EmployeesManagementPage() {
     currency: 'INR',
     overtimeMultiplier: 1.5,
     standardDailyHours: 8,
+    overtimeRateMode: 'MULTIPLIER' as 'MULTIPLIER' | 'FIXED',
+    overtimeFixedRate: 0,
+    overtimeEnabled: true,
     status: 'ACTIVE'
   });
   const [isEditing, setIsEditing] = useState<boolean>(false);
@@ -202,7 +212,10 @@ export default function EmployeesManagementPage() {
       hourlyRate: 25,
       currency: 'INR',
       overtimeMultiplier: 1.5,
-      standardDailyHours: 8
+      standardDailyHours: 8,
+      overtimeRateMode: 'MULTIPLIER',
+      overtimeFixedRate: 0,
+      overtimeEnabled: true
     });
     setAddError('');
     setIsAddModalOpen(true);
@@ -231,7 +244,10 @@ export default function EmployeesManagementPage() {
         hourlyRate: Number(addForm.hourlyRate),
         currency: addForm.currency,
         overtimeMultiplier: Number(addForm.overtimeMultiplier),
-        standardDailyHours: Number(addForm.standardDailyHours)
+        standardDailyHours: Number(addForm.standardDailyHours),
+        overtimeRateMode: addForm.overtimeRateMode,
+        overtimeFixedRate: Number(addForm.overtimeFixedRate),
+        overtimeEnabled: addForm.overtimeEnabled
       });
 
       setIsAddModalOpen(false);
@@ -263,6 +279,9 @@ export default function EmployeesManagementPage() {
       currency: emp.currency || 'INR',
       overtimeMultiplier: emp.overtimeMultiplier != null ? emp.overtimeMultiplier : 1.5,
       standardDailyHours: emp.standardDailyHours != null ? emp.standardDailyHours : 8,
+      overtimeRateMode: emp.overtimeRateMode || 'MULTIPLIER',
+      overtimeFixedRate: emp.overtimeFixedRate != null ? emp.overtimeFixedRate : 0,
+      overtimeEnabled: emp.overtimeEnabled !== false,
       status: emp.userId?.status || 'ACTIVE'
     });
     setEditError('');
@@ -292,6 +311,9 @@ export default function EmployeesManagementPage() {
         currency: editForm.currency,
         overtimeMultiplier: Number(editForm.overtimeMultiplier),
         standardDailyHours: Number(editForm.standardDailyHours),
+        overtimeRateMode: editForm.overtimeRateMode,
+        overtimeFixedRate: Number(editForm.overtimeFixedRate),
+        overtimeEnabled: editForm.overtimeEnabled,
         status: editForm.status
       });
 
@@ -711,6 +733,15 @@ export default function EmployeesManagementPage() {
                             title="View Employee Profile & Activity"
                           >
                             <Eye className="w-4 h-4" />
+                          </Link>
+
+                          {/* View Payroll Statement */}
+                          <Link
+                            to={`/dashboard/payroll`}
+                            className="p-1.5 rounded-xl hover:bg-emerald-50 text-slate-500 hover:text-emerald-600 transition-colors"
+                            title="View Employee Payroll & Payslip"
+                          >
+                            <Coins className="w-4 h-4" />
                           </Link>
 
                           {/* Edit Employee */}
