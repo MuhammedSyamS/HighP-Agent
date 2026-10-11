@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { api } from '../../../lib/api';
 import { useAuth } from '../../../lib/authContext';
+import { getSocket } from '../../../lib/socket';
 import { formatDuration, getLocalDateString } from '../../../lib/utils';
 import {
   DollarSign,
@@ -125,6 +126,17 @@ export default function PayrollDashboardPage() {
 
   useEffect(() => {
     fetchPayroll();
+
+    const socket = getSocket();
+    if (!socket) return;
+
+    socket.on('employee:deleted', fetchPayroll);
+    socket.on('employee:created', fetchPayroll);
+
+    return () => {
+      socket.off('employee:deleted', fetchPayroll);
+      socket.off('employee:created', fetchPayroll);
+    };
   }, [fetchPayroll]);
 
   // Load employee detail for payslip modal

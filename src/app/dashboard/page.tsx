@@ -567,6 +567,10 @@ export default function DashboardOverviewPage() {
       socket.on('employee:session_ended', handleSessionChange);
       socket.on('employee:break_started', fetchDashboardData);
       socket.on('employee:break_ended', fetchDashboardData);
+      socket.on('employee:deleted', () => {
+        fetchDashboardData();
+        fetchAttendanceRoster();
+      });
 
       return () => {
         socket.off('agent:current-application', handleCurrentApplication);
@@ -577,6 +581,7 @@ export default function DashboardOverviewPage() {
         socket.off('employee:session_ended', handleSessionChange);
         socket.off('employee:break_started', fetchDashboardData);
         socket.off('employee:break_ended', fetchDashboardData);
+        socket.off('employee:deleted', fetchDashboardData);
       };
     }
   }, [fetchDashboardData, fetchAttendanceRoster]);

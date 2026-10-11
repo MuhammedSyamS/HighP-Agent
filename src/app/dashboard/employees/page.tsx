@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../../../lib/api';
 import { useAuth } from '../../../lib/authContext';
+import { getSocket } from '../../../lib/socket';
 import { formatDuration } from '../../../lib/utils';
 import { StatusBadge } from '../../../components/StatusBadge';
 import {
@@ -151,6 +152,23 @@ export default function EmployeesManagementPage() {
 
   useEffect(() => {
     fetchEmployees();
+
+    const socket = getSocket();
+    if (!socket) return;
+
+    const handleEmployeeDeleted = (data: { employeeProfileId: string; employeeCode?: string }) => {
+      setEmployees((prev) =>
+        prev.filter((e) => e._id !== data.employeeProfileId && e.employeeCode !== data.employeeCode)
+      );
+    };
+
+    socket.on('employee:deleted', handleEmployeeDeleted);
+    socket.on('employee:created', fetchEmployees);
+
+    return () => {
+      socket.off('employee:deleted', handleEmployeeDeleted);
+      socket.off('employee:created', fetchEmployees);
+    };
   }, [fetchEmployees]);
 
   // Generate Suggested Employee Code

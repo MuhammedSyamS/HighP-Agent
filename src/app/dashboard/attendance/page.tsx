@@ -250,10 +250,12 @@ export default function AttendanceDataPage() {
       socket.on('employee:status_changed', handleStatusChange);
       socket.on('employee:session_started', handleStatusChange);
       socket.on('employee:session_ended', handleStatusChange);
+      socket.on('employee:deleted', handleStatusChange);
       return () => {
         socket.off('employee:status_changed', handleStatusChange);
         socket.off('employee:session_started', handleStatusChange);
         socket.off('employee:session_ended', handleStatusChange);
+        socket.off('employee:deleted', handleStatusChange);
       };
     }
   }, [viewMode, dateStr, selectedYear, selectedMonth, fetchRoster, fetchMonthlyAttendance]);
