@@ -6,7 +6,7 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function formatDuration(seconds: number): string {
-  if (!seconds || isNaN(seconds) || seconds <= 0) return '0m';
+  if (!seconds || isNaN(seconds) || seconds <= 0) return '0s';
   const secInt = Math.floor(seconds);
   const hrs = Math.floor(secInt / 3600);
   const mins = Math.floor((secInt % 3600) / 60);
@@ -14,7 +14,10 @@ export function formatDuration(seconds: number): string {
   if (hrs > 0) {
     return `${hrs}h ${mins}m`;
   }
-  return `${mins}m`;
+  if (mins > 0) {
+    return `${mins}m`;
+  }
+  return `${secInt}s`;
 }
 
 export function formatDurationExact(seconds: number): string {

@@ -11,6 +11,7 @@ import ReportsPage from './app/dashboard/reports/page';
 import DevicesPage from './app/dashboard/devices/page';
 import SettingsPage from './app/dashboard/settings/page';
 import EmployeeDetailPage from './app/dashboard/employees/[id]/page';
+import PayrollDashboardPage from './app/dashboard/payroll/page';
 import EmployeeWorkspacePage from './app/employee/page';
 import EmployeeMonitoringTransparencyPage from './app/employee/monitoring/page';
 
@@ -26,6 +27,7 @@ export default function App() {
       <Route path="/dashboard" element={<DashboardLayout />}>
         <Route index element={<DashboardOverviewPage />} />
         <Route path="attendance" element={<AttendanceDataPage />} />
+        <Route path="payroll" element={<PayrollDashboardPage />} />
         <Route path="applications" element={<ApplicationsPage />} />
         <Route path="reports" element={<ReportsPage />} />
         <Route path="devices" element={<DevicesPage />} />

@@ -12,7 +12,8 @@ import {
   Menu,
   X,
   Layers,
-  ChevronRight
+  ChevronRight,
+  Coins
 } from 'lucide-react';
 import { useAuth } from '../lib/authContext';
 import { UserRole } from '@highp/shared';
@@ -43,6 +44,7 @@ export const Sidebar: React.FC = () => {
       ? [
           { name: 'Live Dashboard', href: '/dashboard', icon: LayoutDashboard },
           { name: 'Attendance Data', href: '/dashboard/attendance', icon: CalendarCheck },
+          { name: 'Payroll & Salaries', href: '/dashboard/payroll', icon: Coins },
           { name: 'App Tracking', href: '/dashboard/settings?tab=applications', icon: Layers },
           { name: 'App & Web Analytics', href: '/dashboard/applications', icon: PieChart },
           { name: 'Reports', href: '/dashboard/reports', icon: FileBarChart },

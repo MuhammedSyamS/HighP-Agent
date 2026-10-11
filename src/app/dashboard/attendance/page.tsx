@@ -1351,7 +1351,7 @@ export default function AttendanceDataPage() {
                           : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
                       }`}
                     >
-                      Applications ({detailData.topApps.length})
+                      Applications ({detailData.topApps.filter((a: any) => a.applicationName && a.applicationName.toLowerCase() !== 'unknown application' && a.applicationName.toLowerCase() !== 'system idle' && a.applicationName.toLowerCase() !== 'system' && !a.applicationName.toLowerCase().includes('highp') && !a.applicationName.toLowerCase().includes('electron')).length})
                     </button>
                     <button
                       onClick={() => setModalTab('websites')}
@@ -1386,11 +1386,13 @@ export default function AttendanceDataPage() {
                       <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">
                         Desktop Applications Tracked
                       </h4>
-                      {detailData.topApps.length === 0 ? (
+                      {detailData.topApps.filter((a: any) => a.applicationName && a.applicationName.toLowerCase() !== 'unknown application' && a.applicationName.toLowerCase() !== 'system idle' && a.applicationName.toLowerCase() !== 'system' && !a.applicationName.toLowerCase().includes('highp') && !a.applicationName.toLowerCase().includes('electron')).length === 0 ? (
                         <p className="text-xs text-slate-400 py-8 text-center">No desktop applications recorded for this date.</p>
                       ) : (
                         <div className="space-y-3">
-                          {detailData.topApps.map((app, idx) => (
+                          {detailData.topApps
+                            .filter((a: any) => a.applicationName && a.applicationName.toLowerCase() !== 'unknown application' && a.applicationName.toLowerCase() !== 'system idle' && a.applicationName.toLowerCase() !== 'system' && !a.applicationName.toLowerCase().includes('highp') && !a.applicationName.toLowerCase().includes('electron'))
+                            .map((app, idx) => (
                             <div
                               key={idx}
                               className="flex items-center justify-between p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs hover:bg-slate-100/60 transition-colors"

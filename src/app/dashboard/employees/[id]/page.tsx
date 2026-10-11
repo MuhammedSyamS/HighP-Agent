@@ -46,7 +46,21 @@ export default function EmployeeDetailPage() {
 
       if (empRes.data?.data) setEmployeeData(empRes.data.data);
       if (timelineRes.data?.data?.events) setTimelineEvents(timelineRes.data.data.events);
-      if (appRes.data?.data?.applications) setAppUsages(appRes.data.data.applications);
+      let apps = appRes.data?.data?.applications || [];
+      if (apps.length === 0 && empRes.data?.data?.topApps?.length > 0) {
+        apps = empRes.data.data.topApps;
+      }
+      setAppUsages(
+        apps.filter(
+          (a: any) =>
+            a.applicationName &&
+            a.applicationName.toLowerCase() !== 'unknown application' &&
+            a.applicationName.toLowerCase() !== 'system idle' &&
+            a.applicationName.toLowerCase() !== 'system' &&
+            !a.applicationName.toLowerCase().includes('highp') &&
+            !a.applicationName.toLowerCase().includes('electron')
+        )
+      );
       if (attRes.data?.data) setAttendanceHistory(attRes.data.data);
     } catch (err) {
       console.error('[EmployeeDetail] Fetch error:', err);

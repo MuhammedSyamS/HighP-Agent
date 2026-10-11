@@ -23,6 +23,8 @@ import {
   ExternalLink
 } from 'lucide-react';
 
+
+
 export default function HighphausInternalPortal() {
   const { user } = useAuth();
   const [mounted, setMounted] = useState(false);
@@ -188,13 +190,13 @@ export default function HighphausInternalPortal() {
         <div className="max-w-5xl mx-auto text-center relative z-10">
           <div className="inline-flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-[11px] sm:text-xs font-semibold mb-6 max-w-full">
             <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-indigo-400 shrink-0" />
-            <span className="truncate">Highphaus Creative Agency • Internal Activity & Attendance Hub</span>
+            <span className="truncate">Highphaus Creative Agency • Internal Activity &amp; Attendance Hub</span>
           </div>
 
           <h1 className="text-3xl xs:text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight text-white leading-[1.15] text-balance">
             Highphaus Agency <br />
             <span className="bg-gradient-to-r from-indigo-400 via-purple-300 to-pink-400 bg-clip-text text-transparent">
-              Workforce Activity & Attendance
+              Workforce Activity &amp; Attendance
             </span>
           </h1>
 

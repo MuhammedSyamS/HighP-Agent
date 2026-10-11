@@ -266,50 +266,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     window.location.href = targetUrl;
   };
 
-  // Idle Auto-Logout: automatically logs out after 30 minutes of user inactivity
-  useEffect(() => {
-    if (!token || !user) return;
+  // Note: Idle auto-logout feature removed per requirement to keep users logged in and calculate idle time
 
-    const IDLE_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
-    let timeoutId: NodeJS.Timeout;
-
-    const performAutoLogout = () => {
-      const email = user?.email || '';
-      if (email) {
-        localStorage.setItem('highp_last_email', email);
-      }
-      localStorage.setItem('highp_session_expired', 'true');
-      logout('/login?reason=idle_timeout');
-    };
-
-    const resetTimer = () => {
-      clearTimeout(timeoutId);
-      timeoutId = setTimeout(performAutoLogout, IDLE_TIMEOUT_MS);
-    };
-
-    let lastInteraction = Date.now();
-    const handleActivity = () => {
-      const now = Date.now();
-      if (now - lastInteraction > 5000) {
-        lastInteraction = now;
-        resetTimer();
-      }
-    };
-
-    resetTimer();
-
-    const activityEvents = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart', 'click'];
-    activityEvents.forEach((evt) => {
-      window.addEventListener(evt, handleActivity, { passive: true });
-    });
-
-    return () => {
-      clearTimeout(timeoutId);
-      activityEvents.forEach((evt) => {
-        window.removeEventListener(evt, handleActivity);
-      });
-    };
-  }, [token, user]);
 
   return (
     <AuthContext.Provider
