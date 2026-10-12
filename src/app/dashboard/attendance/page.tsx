@@ -28,7 +28,13 @@ import {
   CalendarDays,
   TrendingUp,
   BarChart3,
-  Award
+  Award,
+  Pencil,
+  Trash2,
+  PlusCircle,
+  Save,
+  CheckCircle,
+  AlertTriangle
 } from 'lucide-react';
 import { api } from '../../../lib/api';
 import { StatusBadge } from '../../../components/StatusBadge';
@@ -175,6 +181,295 @@ export default function AttendanceDataPage() {
   const [monthlyDeptFilter, setMonthlyDeptFilter] = useState<string>('ALL');
   const [monthlyRateFilter, setMonthlyRateFilter] = useState<string>('ALL');
   const [selectedMonthlyEmp, setSelectedMonthlyEmp] = useState<MonthlyEmployeeItem | null>(null);
+
+  // Toast notifications
+  const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const showToast = (type: 'success' | 'error', message: string) => {
+    setToast({ type, message });
+    setTimeout(() => setToast(null), 4000);
+  };
+
+  // Submitting state for HR actions
+  const [actionSubmitting, setActionSubmitting] = useState<boolean>(false);
+
+  // Full employees list for manual attendance selection
+  const [employeesList, setEmployeesList] = useState<Array<{ id: string; name: string; code: string; dept: string }>>([]);
+
+  // Manual Attendance Entry Modal
+  const [showManualModal, setShowManualModal] = useState<boolean>(false);
+  const [manualForm, setManualForm] = useState({
+    employeeId: '',
+    date: getLocalDateString(),
+    startTime: '09:00',
+    endTime: '17:00',
+    status: 'PRESENT',
+    activeHours: '8',
+    breakMinutes: '60',
+    adminNote: ''
+  });
+
+  // Edit Daily Roster Record Modal
+  const [editingRosterItem, setEditingRosterItem] = useState<{
+    employeeId: string;
+    name: string;
+    employeeCode: string;
+    date: string;
+    status: string;
+    startedTime: string;
+    endedTime: string;
+    activeHours: string;
+    idleHours: string;
+    breakMinutes: string;
+    adminNote: string;
+  } | null>(null);
+
+  // Edit Single Session Modal
+  const [editingSessionItem, setEditingSessionItem] = useState<{
+    sessionId: string;
+    sessionIndex: number;
+    employeeId: string;
+    status: string;
+    startedAt: string;
+    endedAt: string;
+    activeMinutes: number;
+    idleMinutes: number;
+    breakMinutes: number;
+    adminNote: string;
+  } | null>(null);
+
+  // Delete Confirmation Modal
+  const [deletingItem, setDeletingItem] = useState<{
+    type: 'daily' | 'session';
+    id: string;
+    secondaryId?: string;
+    name: string;
+    date?: string;
+    label: string;
+  } | null>(null);
+
+  // Fetch all registered employees for manual selection
+  const fetchEmployeesList = useCallback(async () => {
+    try {
+      const res = await api.get('/employees');
+      if (res.data?.data && Array.isArray(res.data.data)) {
+        const list = res.data.data.map((p: any) => ({
+          id: p._id,
+          name: p.userId ? `${p.userId.firstName || ''} ${p.userId.lastName || ''}`.trim() || 'Employee' : 'Employee',
+          code: p.employeeCode || '',
+          dept: p.department || 'General'
+        }));
+        setEmployeesList(list);
+      }
+    } catch (err) {
+      console.error('Failed to load employee list:', err);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchEmployeesList();
+  }, [fetchEmployeesList]);
+
+  // Open Edit Roster Record
+  const openEditRoster = (emp: EmployeeRosterItem) => {
+    let startTime = '';
+    if (emp.shiftStartedAt) {
+      const d = new Date(emp.shiftStartedAt);
+      startTime = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    } else {
+      startTime = '09:00';
+    }
+
+    let endTime = '';
+    if (emp.shiftEndedAt) {
+      const d = new Date(emp.shiftEndedAt);
+      endTime = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    } else if (emp.attendanceStatus === 'PRESENT_ACTIVE') {
+      endTime = '';
+    } else {
+      endTime = '17:00';
+    }
+
+    const actHrs = (emp.totalActiveSeconds / 3600).toFixed(1);
+    const idlHrs = (emp.totalIdleSeconds / 3600).toFixed(1);
+    const brkMins = Math.round(emp.totalBreakSeconds / 60).toString();
+
+    let mappedStatus = emp.attendanceStatus;
+    if (mappedStatus === 'SHIFT_COMPLETED') mappedStatus = 'PRESENT';
+
+    setEditingRosterItem({
+      employeeId: emp.employeeId,
+      name: emp.name,
+      employeeCode: emp.employeeCode,
+      date: dateStr,
+      status: mappedStatus,
+      startedTime: startTime,
+      endedTime: endTime,
+      activeHours: actHrs,
+      idleHours: idlHrs,
+      breakMinutes: brkMins,
+      adminNote: ''
+    });
+  };
+
+  // Save Edit Roster Record
+  const handleSaveRosterEdit = async () => {
+    if (!editingRosterItem) return;
+    try {
+      setActionSubmitting(true);
+      let sAt: string | undefined = undefined;
+      let eAt: string | undefined = undefined;
+
+      if (editingRosterItem.startedTime) {
+        sAt = `${editingRosterItem.date}T${editingRosterItem.startedTime}:00`;
+      }
+      if (editingRosterItem.endedTime && editingRosterItem.status !== 'PRESENT_ACTIVE') {
+        eAt = `${editingRosterItem.date}T${editingRosterItem.endedTime}:00`;
+      }
+
+      const actSec = Math.round(parseFloat(editingRosterItem.activeHours || '0') * 3600);
+      const idlSec = Math.round(parseFloat(editingRosterItem.idleHours || '0') * 3600);
+      const brkSec = Math.round(parseInt(editingRosterItem.breakMinutes || '0', 10) * 60);
+
+      await api.patch('/attendance/roster/status', {
+        employeeId: editingRosterItem.employeeId,
+        date: editingRosterItem.date,
+        status: editingRosterItem.status,
+        startedAt: sAt,
+        endedAt: eAt,
+        activeSeconds: actSec,
+        idleSeconds: idlSec,
+        breakSeconds: brkSec,
+        adminNote: editingRosterItem.adminNote || 'Modified by HR'
+      });
+
+      showToast('success', `Attendance updated for ${editingRosterItem.name}`);
+      setEditingRosterItem(null);
+      fetchRoster(dateStr);
+    } catch (err: any) {
+      console.error('Failed to update attendance:', err);
+      showToast('error', err.response?.data?.message || 'Failed to update attendance record');
+    } finally {
+      setActionSubmitting(false);
+    }
+  };
+
+  // Save Manual Attendance Record
+  const handleCreateManualAttendance = async () => {
+    if (!manualForm.employeeId) {
+      showToast('error', 'Please select an employee');
+      return;
+    }
+    try {
+      setActionSubmitting(true);
+      const activeMins = Math.round(parseFloat(manualForm.activeHours || '8') * 60);
+      const breakMins = parseInt(manualForm.breakMinutes || '60', 10);
+
+      await api.post('/attendance/manual', {
+        employeeId: manualForm.employeeId,
+        date: manualForm.date,
+        startTime: manualForm.startTime,
+        endTime: manualForm.endTime,
+        status: manualForm.status,
+        activeMinutes: activeMins,
+        breakMinutes: breakMins,
+        adminNote: manualForm.adminNote || 'Manual attendance entered by HR'
+      });
+
+      showToast('success', 'Manual attendance record created successfully');
+      setShowManualModal(false);
+      fetchRoster(dateStr);
+    } catch (err: any) {
+      console.error('Failed to create manual attendance:', err);
+      showToast('error', err.response?.data?.message || 'Failed to create manual attendance');
+    } finally {
+      setActionSubmitting(false);
+    }
+  };
+
+  // Open Edit Session
+  const openEditSession = (sess: any, index: number, empId: string) => {
+    const sDate = new Date(sess.startedAt);
+    const sTime = `${String(sDate.getHours()).padStart(2, '0')}:${String(sDate.getMinutes()).padStart(2, '0')}`;
+    let eTime = '';
+    if (sess.endedAt) {
+      const eDate = new Date(sess.endedAt);
+      eTime = `${String(eDate.getHours()).padStart(2, '0')}:${String(eDate.getMinutes()).padStart(2, '0')}`;
+    }
+
+    setEditingSessionItem({
+      sessionId: sess._id || sess.id,
+      sessionIndex: index + 1,
+      employeeId: empId,
+      status: sess.status || 'COMPLETED',
+      startedAt: sTime,
+      endedAt: eTime,
+      activeMinutes: Math.round((sess.activeSeconds || 0) / 60),
+      idleMinutes: Math.round((sess.idleSeconds || 0) / 60),
+      breakMinutes: Math.round((sess.breakSeconds || 0) / 60),
+      adminNote: sess.adminNote || ''
+    });
+  };
+
+  // Save Edit Session
+  const handleSaveSessionEdit = async () => {
+    if (!editingSessionItem) return;
+    try {
+      setActionSubmitting(true);
+      const sAt = `${dateStr}T${editingSessionItem.startedAt}:00`;
+      let eAt: string | undefined = undefined;
+      if (editingSessionItem.endedAt && editingSessionItem.status !== 'ACTIVE') {
+        eAt = `${dateStr}T${editingSessionItem.endedAt}:00`;
+      }
+
+      await api.put(`/attendance/session/${editingSessionItem.sessionId}`, {
+        startedAt: sAt,
+        endedAt: eAt,
+        activeSeconds: editingSessionItem.activeMinutes * 60,
+        idleSeconds: editingSessionItem.idleMinutes * 60,
+        breakSeconds: editingSessionItem.breakMinutes * 60,
+        status: editingSessionItem.status,
+        adminNote: editingSessionItem.adminNote || 'Modified by HR'
+      });
+
+      showToast('success', `Session #${editingSessionItem.sessionIndex} updated successfully`);
+      setEditingSessionItem(null);
+      if (selectedEmpId) {
+        openFullTracking(selectedEmpId);
+      }
+      fetchRoster(dateStr);
+    } catch (err: any) {
+      console.error('Failed to update session:', err);
+      showToast('error', err.response?.data?.message || 'Failed to update session');
+    } finally {
+      setActionSubmitting(false);
+    }
+  };
+
+  // Confirm Delete
+  const handleConfirmDelete = async () => {
+    if (!deletingItem) return;
+    try {
+      setActionSubmitting(true);
+      if (deletingItem.type === 'daily') {
+        await api.delete(`/attendance/employee/${deletingItem.id}/date/${deletingItem.secondaryId || dateStr}`);
+        showToast('success', `Attendance record deleted for ${deletingItem.name}`);
+        fetchRoster(dateStr);
+      } else if (deletingItem.type === 'session') {
+        await api.delete(`/attendance/session/${deletingItem.id}`);
+        showToast('success', 'Session deleted successfully');
+        if (selectedEmpId) {
+          openFullTracking(selectedEmpId);
+        }
+        fetchRoster(dateStr);
+      }
+      setDeletingItem(null);
+    } catch (err: any) {
+      console.error('Failed to delete item:', err);
+      showToast('error', err.response?.data?.message || 'Failed to delete record');
+    } finally {
+      setActionSubmitting(false);
+    }
+  };
 
   // Fetch Daily Attendance Roster
   const fetchRoster = useCallback(async (targetDate: string) => {
@@ -564,6 +859,26 @@ export default function AttendanceDataPage() {
                 <Download className="w-4 h-4 text-slate-500" />
                 <span>Export Daily CSV</span>
               </button>
+
+              <button
+                onClick={() => {
+                  setManualForm({
+                    employeeId: roster[0]?.employeeId || employeesList[0]?.id || '',
+                    date: dateStr,
+                    startTime: '09:00',
+                    endTime: '17:00',
+                    status: 'PRESENT',
+                    activeHours: '8',
+                    breakMinutes: '60',
+                    adminNote: ''
+                  });
+                  setShowManualModal(true);
+                }}
+                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-xs transition-colors cursor-pointer"
+              >
+                <PlusCircle className="w-4 h-4" />
+                <span>Record Attendance</span>
+              </button>
             </div>
           ) : (
             /* Controls for MONTHLY mode */
@@ -770,7 +1085,7 @@ export default function AttendanceDataPage() {
                     <th className="py-3.5 px-4 font-mono text-emerald-700">Active Work</th>
                     <th className="py-3.5 px-4 font-mono text-amber-700">Idle Time</th>
                     <th className="py-3.5 px-4 font-mono text-indigo-700">Breaks</th>
-                    <th className="py-3.5 px-4 text-right">Full Tracking</th>
+                    <th className="py-3.5 px-4 text-right">Actions & Tracking</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -887,17 +1202,45 @@ export default function AttendanceDataPage() {
                             {emp.totalBreakSeconds > 0 ? formatDuration(emp.totalBreakSeconds) : '0m'}
                           </td>
 
-                          <td className="py-3.5 px-4 text-right">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                openFullTracking(emp.employeeId);
-                              }}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-600 text-indigo-700 hover:text-white rounded-xl text-xs font-bold transition-all shadow-2xs"
-                            >
-                              <Eye className="w-3.5 h-3.5" />
-                              <span>Inspect</span>
-                            </button>
+                          <td className="py-3.5 px-4 text-right" onClick={(e) => e.stopPropagation()}>
+                            <div className="flex items-center justify-end gap-1.5">
+                              {/* Edit Daily Attendance */}
+                              <button
+                                onClick={() => openEditRoster(emp)}
+                                className="p-1.5 hover:bg-indigo-50 text-slate-500 hover:text-indigo-600 rounded-lg transition-colors cursor-pointer"
+                                title="Edit Attendance Record"
+                              >
+                                <Pencil className="w-4 h-4" />
+                              </button>
+
+                              {/* Inspect Full Tracking */}
+                              <button
+                                onClick={() => openFullTracking(emp.employeeId)}
+                                className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-indigo-50 hover:bg-indigo-600 text-indigo-700 hover:text-white rounded-lg text-xs font-bold transition-all shadow-2xs cursor-pointer"
+                                title="Inspect Telemetry & Timeline"
+                              >
+                                <Eye className="w-3.5 h-3.5" />
+                                <span>Inspect</span>
+                              </button>
+
+                              {/* Delete Record */}
+                              <button
+                                onClick={() =>
+                                  setDeletingItem({
+                                    type: 'daily',
+                                    id: emp.employeeId,
+                                    secondaryId: dateStr,
+                                    name: emp.name,
+                                    date: dateStr,
+                                    label: `attendance record for ${emp.name} on ${dateStr}`
+                                  })
+                                }
+                                className="p-1.5 hover:bg-rose-50 text-slate-400 hover:text-rose-600 rounded-lg transition-colors cursor-pointer"
+                                title="Delete / Reset Attendance"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       );
@@ -1469,22 +1812,59 @@ export default function AttendanceDataPage() {
                               <div className="flex items-center gap-3">
                                 <Clock className="w-4 h-4 text-indigo-600 shrink-0" />
                                 <div>
-                                  <span className="font-extrabold text-slate-900 block">
-                                    Session #{idx + 1} • {sess.status}
-                                  </span>
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-extrabold text-slate-900 block">
+                                      Session #{idx + 1} • {sess.status}
+                                    </span>
+                                    {sess.isManual && (
+                                      <span className="text-[10px] bg-amber-100 text-amber-800 font-semibold px-2 py-0.5 rounded-full">
+                                        Manual Entry
+                                      </span>
+                                    )}
+                                  </div>
                                   <span className="text-[10px] text-slate-500 font-mono">
                                     {new Date(sess.startedAt).toLocaleTimeString()} →{' '}
                                     {sess.endedAt ? new Date(sess.endedAt).toLocaleTimeString() : 'Active Now'}
                                   </span>
+                                  {sess.adminNote && (
+                                    <span className="text-[10px] text-indigo-600 italic block mt-0.5">
+                                      Note: {sess.adminNote}
+                                    </span>
+                                  )}
                                 </div>
                               </div>
-                              <div className="text-right font-mono">
-                                <span className="font-bold text-slate-800 block">
-                                  Active: {formatDuration(sess.activeSeconds || 0)}
-                                </span>
-                                <span className="text-[10px] text-amber-600 font-semibold block">
-                                  Idle: {formatDuration(sess.idleSeconds || 0)}
-                                </span>
+                              <div className="flex items-center gap-4">
+                                <div className="text-right font-mono">
+                                  <span className="font-bold text-slate-800 block">
+                                    Active: {formatDuration(sess.activeSeconds || 0)}
+                                  </span>
+                                  <span className="text-[10px] text-amber-600 font-semibold block">
+                                    Idle: {formatDuration(sess.idleSeconds || 0)}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-1 border-l border-slate-200 pl-3">
+                                  <button
+                                    onClick={() => openEditSession(sess, idx, detailData.profile._id)}
+                                    className="p-1.5 hover:bg-indigo-50 text-slate-500 hover:text-indigo-600 rounded-lg transition-colors cursor-pointer"
+                                    title="Edit Session"
+                                  >
+                                    <Pencil className="w-3.5 h-3.5" />
+                                  </button>
+                                  <button
+                                    onClick={() =>
+                                      setDeletingItem({
+                                        type: 'session',
+                                        id: sess._id || sess.id,
+                                        name: detailData.profile.name,
+                                        label: `Work Session #${idx + 1}`
+                                      })
+                                    }
+                                    className="p-1.5 hover:bg-rose-50 text-slate-400 hover:text-rose-600 rounded-lg transition-colors cursor-pointer"
+                                    title="Delete Session"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
                               </div>
                             </div>
                           ))}
@@ -1727,6 +2107,537 @@ export default function AttendanceDataPage() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+      {/* ======================================================== */}
+      {/* MODAL 3: EDIT DAILY ATTENDANCE MODAL                      */}
+      {/* ======================================================== */}
+      {editingRosterItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-slate-900/60 backdrop-blur-xs animate-fade-in">
+          <div className="bg-white border border-slate-200 rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden animate-scale-up">
+            <div className="p-6 border-b border-slate-200 flex items-center justify-between bg-slate-50/80">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold">
+                  <Pencil className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-900">Edit Attendance Record</h3>
+                  <p className="text-xs text-slate-500">
+                    {editingRosterItem.name} ({editingRosterItem.employeeCode}) • {editingRosterItem.date}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setEditingRosterItem(null)}
+                className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
+              <div>
+                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-1.5">
+                  Attendance Status
+                </label>
+                <select
+                  value={editingRosterItem.status}
+                  onChange={(e) => setEditingRosterItem({ ...editingRosterItem, status: e.target.value })}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs font-bold text-slate-800 focus:outline-none focus:border-indigo-500"
+                >
+                  <option value="PRESENT">Present (Completed Shift)</option>
+                  <option value="PRESENT_ACTIVE">Working Now (Active Shift)</option>
+                  <option value="HALF_DAY">Half Day</option>
+                  <option value="LATE">Late Arrival</option>
+                  <option value="LEAVE">Approved Leave</option>
+                  <option value="ABSENT">Absent (Clear Work Hours)</option>
+                </select>
+              </div>
+
+              {editingRosterItem.status !== 'ABSENT' && (
+                <>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-1.5">
+                        Clock In Time
+                      </label>
+                      <input
+                        type="time"
+                        value={editingRosterItem.startedTime}
+                        onChange={(e) => setEditingRosterItem({ ...editingRosterItem, startedTime: e.target.value })}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs font-mono font-bold text-slate-800 focus:outline-none focus:border-indigo-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-1.5">
+                        Clock Out Time
+                      </label>
+                      <input
+                        type="time"
+                        value={editingRosterItem.endedTime}
+                        onChange={(e) => setEditingRosterItem({ ...editingRosterItem, endedTime: e.target.value })}
+                        disabled={editingRosterItem.status === 'PRESENT_ACTIVE'}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs font-mono font-bold text-slate-800 focus:outline-none focus:border-indigo-500 disabled:opacity-50"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-3">
+                    <div>
+                      <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-1.5">
+                        Active Hours
+                      </label>
+                      <input
+                        type="number"
+                        step="0.1"
+                        min="0"
+                        max="24"
+                        value={editingRosterItem.activeHours}
+                        onChange={(e) => setEditingRosterItem({ ...editingRosterItem, activeHours: e.target.value })}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs font-mono font-bold text-slate-800 focus:outline-none focus:border-indigo-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-1.5">
+                        Idle Hours
+                      </label>
+                      <input
+                        type="number"
+                        step="0.1"
+                        min="0"
+                        max="24"
+                        value={editingRosterItem.idleHours}
+                        onChange={(e) => setEditingRosterItem({ ...editingRosterItem, idleHours: e.target.value })}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs font-mono font-bold text-slate-800 focus:outline-none focus:border-indigo-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-1.5">
+                        Breaks (Min)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        max="300"
+                        value={editingRosterItem.breakMinutes}
+                        onChange={(e) => setEditingRosterItem({ ...editingRosterItem, breakMinutes: e.target.value })}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs font-mono font-bold text-slate-800 focus:outline-none focus:border-indigo-500"
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+
+              <div>
+                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-1.5">
+                  Audit Reason / Note (HR)
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="e.g. Employee forgot desktop agent, manager approved time adjustment"
+                  value={editingRosterItem.adminNote}
+                  onChange={(e) => setEditingRosterItem({ ...editingRosterItem, adminNote: e.target.value })}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-slate-800 focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+            </div>
+
+            <div className="p-4 border-t border-slate-200 bg-slate-50 flex items-center justify-end gap-3">
+              <button
+                onClick={() => setEditingRosterItem(null)}
+                className="px-4 py-2 rounded-xl border border-slate-200 text-slate-700 font-bold text-xs hover:bg-slate-100 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveRosterEdit}
+                disabled={actionSubmitting}
+                className="flex items-center gap-2 px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-xs transition-colors disabled:opacity-50"
+              >
+                <Save className="w-3.5 h-3.5" />
+                <span>{actionSubmitting ? 'Saving...' : 'Save Record'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* MODAL 4: MANUAL ATTENDANCE ENTRY MODAL                    */}
+      {/* ======================================================== */}
+      {showManualModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-slate-900/60 backdrop-blur-xs animate-fade-in">
+          <div className="bg-white border border-slate-200 rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden animate-scale-up">
+            <div className="p-6 border-b border-slate-200 flex items-center justify-between bg-slate-50/80">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold">
+                  <PlusCircle className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-900">Record Manual Attendance</h3>
+                  <p className="text-xs text-slate-500">
+                    Add official attendance for off-site or unrecorded work
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowManualModal(false)}
+                className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
+              <div>
+                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-1.5">
+                  Select Employee *
+                </label>
+                <select
+                  value={manualForm.employeeId}
+                  onChange={(e) => setManualForm({ ...manualForm, employeeId: e.target.value })}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs font-bold text-slate-800 focus:outline-none focus:border-indigo-500"
+                >
+                  <option value="">-- Choose Employee --</option>
+                  {(employeesList.length > 0 ? employeesList : roster.map((r) => ({ id: r.employeeId, name: r.name, code: r.employeeCode, dept: r.department }))).map((emp) => (
+                    <option key={emp.id} value={emp.id}>
+                      {emp.name} ({emp.code}) • {emp.dept}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-1.5">
+                    Attendance Date *
+                  </label>
+                  <input
+                    type="date"
+                    value={manualForm.date}
+                    onChange={(e) => setManualForm({ ...manualForm, date: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs font-bold text-slate-800 focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-1.5">
+                    Status *
+                  </label>
+                  <select
+                    value={manualForm.status}
+                    onChange={(e) => setManualForm({ ...manualForm, status: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs font-bold text-slate-800 focus:outline-none focus:border-indigo-500"
+                  >
+                    <option value="PRESENT">Present (Full Day)</option>
+                    <option value="HALF_DAY">Half Day</option>
+                    <option value="LATE">Late Arrival</option>
+                    <option value="LEAVE">Approved Leave</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-1.5">
+                    Start Time
+                  </label>
+                  <input
+                    type="time"
+                    value={manualForm.startTime}
+                    onChange={(e) => setManualForm({ ...manualForm, startTime: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs font-mono font-bold text-slate-800 focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-1.5">
+                    End Time
+                  </label>
+                  <input
+                    type="time"
+                    value={manualForm.endTime}
+                    onChange={(e) => setManualForm({ ...manualForm, endTime: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs font-mono font-bold text-slate-800 focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-1.5">
+                    Active Work (Hours)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    min="0"
+                    max="24"
+                    value={manualForm.activeHours}
+                    onChange={(e) => setManualForm({ ...manualForm, activeHours: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs font-mono font-bold text-slate-800 focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-1.5">
+                    Breaks (Minutes)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="300"
+                    value={manualForm.breakMinutes}
+                    onChange={(e) => setManualForm({ ...manualForm, breakMinutes: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs font-mono font-bold text-slate-800 focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-1.5">
+                  Approval Reason / Notes
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="e.g. Client visit in Kochi branch, off-site project work"
+                  value={manualForm.adminNote}
+                  onChange={(e) => setManualForm({ ...manualForm, adminNote: e.target.value })}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-slate-800 focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+            </div>
+
+            <div className="p-4 border-t border-slate-200 bg-slate-50 flex items-center justify-end gap-3">
+              <button
+                onClick={() => setShowManualModal(false)}
+                className="px-4 py-2 rounded-xl border border-slate-200 text-slate-700 font-bold text-xs hover:bg-slate-100 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCreateManualAttendance}
+                disabled={actionSubmitting || !manualForm.employeeId}
+                className="flex items-center gap-2 px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-xs transition-colors disabled:opacity-50"
+              >
+                <PlusCircle className="w-3.5 h-3.5" />
+                <span>{actionSubmitting ? 'Recording...' : 'Record Attendance'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* MODAL 5: EDIT SINGLE SESSION MODAL                        */}
+      {/* ======================================================== */}
+      {editingSessionItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-slate-900/60 backdrop-blur-xs animate-fade-in">
+          <div className="bg-white border border-slate-200 rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden animate-scale-up">
+            <div className="p-6 border-b border-slate-200 flex items-center justify-between bg-slate-50/80">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold">
+                  <Clock className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-900">
+                    Edit Work Session #{editingSessionItem.sessionIndex}
+                  </h3>
+                  <p className="text-xs text-slate-500">Adjust session timestamps and duration</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setEditingSessionItem(null)}
+                className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-1.5">
+                  Session Status
+                </label>
+                <select
+                  value={editingSessionItem.status}
+                  onChange={(e) => setEditingSessionItem({ ...editingSessionItem, status: e.target.value })}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs font-bold text-slate-800 focus:outline-none focus:border-indigo-500"
+                >
+                  <option value="COMPLETED">Completed Session</option>
+                  <option value="ACTIVE">Active Now</option>
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-1.5">
+                    Start Time
+                  </label>
+                  <input
+                    type="time"
+                    value={editingSessionItem.startedAt}
+                    onChange={(e) => setEditingSessionItem({ ...editingSessionItem, startedAt: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs font-mono font-bold text-slate-800 focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-1.5">
+                    End Time
+                  </label>
+                  <input
+                    type="time"
+                    value={editingSessionItem.endedAt}
+                    onChange={(e) => setEditingSessionItem({ ...editingSessionItem, endedAt: e.target.value })}
+                    disabled={editingSessionItem.status === 'ACTIVE'}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs font-mono font-bold text-slate-800 focus:outline-none focus:border-indigo-500 disabled:opacity-50"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-1.5">
+                    Active (Min)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={editingSessionItem.activeMinutes}
+                    onChange={(e) =>
+                      setEditingSessionItem({
+                        ...editingSessionItem,
+                        activeMinutes: parseInt(e.target.value, 10) || 0
+                      })
+                    }
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs font-mono font-bold text-slate-800 focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-1.5">
+                    Idle (Min)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={editingSessionItem.idleMinutes}
+                    onChange={(e) =>
+                      setEditingSessionItem({
+                        ...editingSessionItem,
+                        idleMinutes: parseInt(e.target.value, 10) || 0
+                      })
+                    }
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs font-mono font-bold text-slate-800 focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-1.5">
+                    Break (Min)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={editingSessionItem.breakMinutes}
+                    onChange={(e) =>
+                      setEditingSessionItem({
+                        ...editingSessionItem,
+                        breakMinutes: parseInt(e.target.value, 10) || 0
+                      })
+                    }
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs font-mono font-bold text-slate-800 focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-1.5">
+                  Admin Note
+                </label>
+                <input
+                  type="text"
+                  placeholder="Reason for editing session"
+                  value={editingSessionItem.adminNote}
+                  onChange={(e) => setEditingSessionItem({ ...editingSessionItem, adminNote: e.target.value })}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+            </div>
+
+            <div className="p-4 border-t border-slate-200 bg-slate-50 flex items-center justify-end gap-3">
+              <button
+                onClick={() => setEditingSessionItem(null)}
+                className="px-4 py-2 rounded-xl border border-slate-200 text-slate-700 font-bold text-xs hover:bg-slate-100 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveSessionEdit}
+                disabled={actionSubmitting}
+                className="flex items-center gap-2 px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-xs transition-colors disabled:opacity-50"
+              >
+                <Save className="w-3.5 h-3.5" />
+                <span>{actionSubmitting ? 'Saving...' : 'Save Session'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* MODAL 6: DELETE CONFIRMATION MODAL                        */}
+      {/* ======================================================== */}
+      {deletingItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-slate-900/60 backdrop-blur-xs animate-fade-in">
+          <div className="bg-white border border-slate-200 rounded-3xl w-full max-w-md shadow-2xl overflow-hidden animate-scale-up">
+            <div className="p-6 text-center space-y-4">
+              <div className="w-14 h-14 rounded-2xl bg-rose-50 text-rose-600 border border-rose-200 flex items-center justify-center mx-auto shadow-sm">
+                <Trash2 className="w-7 h-7" />
+              </div>
+              <div>
+                <h3 className="text-lg font-black text-slate-900">Confirm Deletion</h3>
+                <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">
+                  Are you sure you want to permanently delete the <span className="font-bold text-slate-800">{deletingItem.label}</span>?
+                  This will remove recorded session telemetry and recalculate the employee's daily metrics.
+                </p>
+              </div>
+            </div>
+
+            <div className="p-4 border-t border-slate-100 bg-slate-50 flex items-center justify-end gap-3">
+              <button
+                onClick={() => setDeletingItem(null)}
+                disabled={actionSubmitting}
+                className="px-4 py-2 rounded-xl border border-slate-200 text-slate-700 font-bold text-xs hover:bg-slate-100 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmDelete}
+                disabled={actionSubmitting}
+                className="flex items-center gap-2 px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-xs transition-colors disabled:opacity-50"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>{actionSubmitting ? 'Deleting...' : 'Yes, Delete Record'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* FLOATING TOAST NOTIFICATION */}
+      {toast && (
+        <div
+          className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-3 rounded-2xl shadow-xl border text-xs font-bold transition-all ${
+            toast.type === 'success'
+              ? 'bg-slate-900 text-white border-emerald-500/50'
+              : 'bg-rose-950 text-rose-100 border-rose-700'
+          }`}
+        >
+          {toast.type === 'success' ? (
+            <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
+          ) : (
+            <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+          )}
+          <span>{toast.message}</span>
+          <button onClick={() => setToast(null)} className="ml-2 text-slate-400 hover:text-white cursor-pointer">
+            <X className="w-3.5 h-3.5" />
+          </button>
         </div>
       )}
     </div>

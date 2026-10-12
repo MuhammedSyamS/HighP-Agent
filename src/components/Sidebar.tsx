@@ -25,13 +25,18 @@ export const Sidebar: React.FC = () => {
   const { user, company, logout } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  // Prevent background scrolling when mobile navigation drawer is open
+  // Prevent background scrolling and handle Escape key when mobile drawer is open
   React.useEffect(() => {
     if (mobileMenuOpen) {
       const originalStyle = window.getComputedStyle(document.body).overflow;
       document.body.style.overflow = 'hidden';
+      const handleKeyDown = (e: KeyboardEvent) => {
+        if (e.key === 'Escape') setMobileMenuOpen(false);
+      };
+      window.addEventListener('keydown', handleKeyDown);
       return () => {
         document.body.style.overflow = originalStyle;
+        window.removeEventListener('keydown', handleKeyDown);
       };
     }
   }, [mobileMenuOpen]);
@@ -136,7 +141,7 @@ export const Sidebar: React.FC = () => {
       {/* MOBILE TOP BAR */}
       <div className="md:hidden bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between sticky top-0 z-30 w-full">
         <div className="flex items-center gap-2.5 min-w-0">
-          <div className="w-8 h-8 rounded-lg bg-black flex items-center justify-center text-white font-black text-base shadow-sm shrink-0">
+          <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-black text-base shadow-sm shrink-0">
             ⚡
           </div>
           <div className="min-w-0">

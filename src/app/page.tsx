@@ -34,13 +34,18 @@ export default function HighphausInternalPortal() {
     setMounted(true);
   }, []);
 
-  // Lock body scroll when mobile drawer is open
+  // Lock body scroll and listen for Escape key when mobile drawer is open
   useEffect(() => {
     if (mobileMenuOpen) {
       const originalOverflow = document.body.style.overflow;
       document.body.style.overflow = 'hidden';
+      const handleKeyDown = (e: KeyboardEvent) => {
+        if (e.key === 'Escape') setMobileMenuOpen(false);
+      };
+      window.addEventListener('keydown', handleKeyDown);
       return () => {
         document.body.style.overflow = originalOverflow;
+        window.removeEventListener('keydown', handleKeyDown);
       };
     }
   }, [mobileMenuOpen]);
