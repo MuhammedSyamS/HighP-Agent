@@ -1124,106 +1124,47 @@ const getBrowserAppName = (): string => {
               <p className="text-xs sm:text-sm text-slate-600 mt-2 max-w-xl leading-relaxed">
                 {isWorking
                   ? isOnBreak
-                    ? 'You are on break. Click "Resume Work" when you return to your workstation.'
-                    : 'Your session is recording active software time, idle intervals, and productivity metrics.'
-                  : hasCompletedShiftToday
-                  ? 'Your shift for today is complete. Next work session starts tomorrow from 8:30 AM.'
-                  : isBefore830AM
-                  ? 'Clock-in opens at 8:30 AM. Standard shift hours are 9:00 AM – 5:00 PM.'
-                  : isPast5PM
-                  ? 'Shift hours concluded at 5:00 PM. Your next work session unlocks tomorrow at 8:30 AM.'
-                  : 'Click Start Work below to begin recording your work session and attendance.'}
+                    ? 'You are currently on break. Use your HighP Desktop Agent to resume your work session.'
+                    : 'Your session is actively streaming from your HighP Desktop Agent.'
+                  : 'Start your shift, pause for breaks, and clock out directly using the HighP Desktop Agent installed on your PC.'}
               </p>
             </div>
 
-            {/* Main Action Buttons */}
+            {/* Desktop Agent Exclusivity Status Banner */}
             <div className="flex flex-col sm:flex-row sm:items-center gap-3 relative z-10 shrink-0 w-full lg:w-auto">
-              {!isWorking ? (
-                <div className="flex flex-col sm:items-end gap-1.5 w-full sm:w-auto">
-                  <button
-                    onClick={handleStartWork}
-                    disabled={loading || !canStartWork}
-                    className={`w-full sm:w-auto justify-center flex items-center gap-2.5 px-8 py-3.5 sm:py-4 rounded-2xl font-black text-sm shadow-md transition-all min-h-[48px] ${
-                      canStartWork
-                        ? 'bg-black hover:bg-slate-800 text-white hover:scale-105 active:scale-95 cursor-pointer'
-                        : 'bg-slate-200 text-slate-500 cursor-not-allowed opacity-80 shadow-none'
-                    }`}
-                    title={
-                      hasCompletedShiftToday
-                        ? 'Shift completed for today. Next shift starts tomorrow at 8:30 AM.'
-                        : isBefore830AM
-                        ? 'Clock-in is enabled from 8:30 AM onwards.'
-                        : isPast5PM
-                        ? 'Shift ended at 5:00 PM. Next shift starts tomorrow at 8:30 AM.'
-                        : 'Click to start recording your work session'
-                    }
-                  >
-                    <Play className={`w-5 h-5 fill-current shrink-0 ${canStartWork ? 'text-white' : 'text-slate-400'}`} />
-                    <span>
-                      {hasCompletedShiftToday
-                        ? 'Shift Completed Today'
-                        : isBefore830AM
-                        ? 'Clock-In Opens @ 8:30 AM'
-                        : isPast5PM
-                        ? 'Shift Concluded @ 5:00 PM'
-                        : 'Start Work'}
+              <div className="flex flex-col sm:items-end gap-1.5 w-full sm:w-auto">
+                <div className={`px-5 py-3 rounded-2xl border font-bold text-xs flex items-center gap-3 shadow-2xs transition-all ${
+                  isWorking
+                    ? isOnBreak
+                      ? 'bg-amber-50 text-amber-800 border-amber-200'
+                      : 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                    : 'bg-slate-50 text-slate-700 border-slate-200'
+                }`}>
+                  <span className={`w-2.5 h-2.5 rounded-full ${
+                    isWorking
+                      ? isOnBreak
+                        ? 'bg-amber-500 animate-pulse'
+                        : 'bg-emerald-500 animate-pulse'
+                      : 'bg-slate-400'
+                  }`} />
+                  <div className="flex flex-col">
+                    <span className="font-extrabold uppercase tracking-wider text-[11px]">
+                      {isWorking
+                        ? isOnBreak
+                          ? 'On Break (Desktop Agent)'
+                          : 'Live Session Streaming'
+                        : 'Agent Standby'}
                     </span>
-                  </button>
-
-                  {!canStartWork && (
-                    <span className="text-[11px] font-bold text-slate-500 text-center sm:text-right">
-                      {hasCompletedShiftToday
-                        ? 'Next shift starts tomorrow at 8:30 AM'
-                        : isBefore830AM
-                        ? 'Enabled at 8:30 AM (Shift: 9 AM – 5 PM)'
-                        : 'Shift concluded for today at 5:00 PM'}
+                    <span className="text-[10px] text-slate-500 font-normal">
+                      Tracked exclusively via HighP Desktop Agent
                     </span>
-                  )}
+                  </div>
                 </div>
-              ) : (
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3 w-full sm:w-auto">
-                  {!isOnBreak ? (
-                    <div className="flex flex-col xs:flex-row items-stretch xs:items-center gap-2 w-full sm:w-auto">
-                      <select
-                        value={breakReason}
-                        onChange={(e) => setBreakReason(e.target.value)}
-                        className="px-3.5 py-2.5 sm:px-4 sm:py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-indigo-500 shadow-2xs min-h-[44px]"
-                      >
-                        <option value={BreakReason.LUNCH}>🥪 Lunch Break</option>
-                        <option value={BreakReason.COFFEE}>☕ Coffee Break</option>
-                        <option value={BreakReason.PERSONAL}>🚶 Personal Break</option>
-                        <option value={BreakReason.MEETING}>👥 Offline Meeting</option>
-                      </select>
-                      <button
-                        onClick={handleStartBreak}
-                        disabled={loading}
-                        className="flex items-center justify-center gap-2 px-4 sm:px-5 py-2.5 sm:py-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs shadow-sm transition-all active:scale-95 whitespace-nowrap min-h-[44px]"
-                      >
-                        <Coffee className="w-4 h-4 shrink-0" />
-                        <span>Take Break</span>
-                      </button>
-                    </div>
-                  ) : (
-                    <button
-                      onClick={handleEndBreak}
-                      disabled={loading}
-                      className="w-full sm:w-auto justify-center flex items-center gap-2 px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md shadow-indigo-600/20 transition-all active:scale-95 min-h-[44px]"
-                    >
-                      <Play className="w-4 h-4 fill-current shrink-0" />
-                      <span>Resume Work</span>
-                    </button>
-                  )}
-
-                  <button
-                    onClick={handleEndWork}
-                    disabled={loading}
-                    className="w-full sm:w-auto justify-center flex items-center gap-2 px-5 py-3 rounded-xl bg-white hover:bg-rose-50 text-rose-700 font-bold text-xs border border-rose-200 shadow-2xs transition-all active:scale-95 min-h-[44px]"
-                  >
-                    <Square className="w-4 h-4 fill-current text-rose-600 shrink-0" />
-                    <span>Clock Out</span>
-                  </button>
-                </div>
-              )}
+                <span className="text-[10.5px] font-semibold text-slate-500 flex items-center gap-1.5">
+                  <ShieldCheck className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                  Clock-in, breaks & clock-out are controlled in your Desktop Agent
+                </span>
+              </div>
             </div>
           </div>
 
@@ -1618,8 +1559,8 @@ const getBrowserAppName = (): string => {
                 {historyFilter === 'yesterday'
                   ? 'No attendance records logged for yesterday.'
                   : historyFilter === 'today'
-                  ? 'No shifts recorded for today yet. Click "Start Work" above to begin your day.'
-                  : 'Start a manual work session to record attendance.'}
+                  ? 'No shifts recorded for today yet. Start work on your HighP Desktop Agent to begin your day.'
+                  : 'Start work on your HighP Desktop Agent to record attendance.'}
               </p>
               <button
                 type="button"
