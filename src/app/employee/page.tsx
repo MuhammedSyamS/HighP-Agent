@@ -33,10 +33,6 @@ import {
   List,
   Layers,
   History,
-  Coins,
-  DollarSign,
-  FileText,
-  Printer,
   Filter,
   Search,
   Timer
@@ -71,38 +67,8 @@ export default function EmployeeWorkspacePage() {
   const [showInstallBanner, setShowInstallBanner] = useState(true);
   const [autoDownloaded, setAutoDownloaded] = useState(false);
 
-  // My Earnings & Payslip modal state
-  const [showMyPayslipModal, setShowMyPayslipModal] = useState<boolean>(false);
-  const [myPayrollData, setMyPayrollData] = useState<any>(null);
-  const [loadingMyPayroll, setLoadingMyPayroll] = useState<boolean>(false);
-
-  const handleOpenMyPayslip = async () => {
-    const empId = profile?._id || currentProfile?._id || user?.employeeProfileId;
-    if (!empId) return;
-    setShowMyPayslipModal(true);
-    setLoadingMyPayroll(true);
-    try {
-      const now = new Date();
-      const y = now.getFullYear();
-      const m = String(now.getMonth() + 1).padStart(2, '0');
-      const startOfMonth = `${y}-${m}-01`;
-      const todayStr = getLocalDateString(now);
-      const res = await api.get(`/payroll/employee/${empId}`, {
-        params: {
-          startDate: startOfMonth,
-          endDate: todayStr,
-          payIdleTime: true
-        }
-      });
-      if (res.data?.success && res.data?.data) {
-        setMyPayrollData(res.data.data);
-      }
-    } catch (e) {
-      console.error('Failed to load employee payslip:', e);
-    } finally {
-      setLoadingMyPayroll(false);
-    }
-  };
+  // Side navigation state: 'history' | 'tracking'
+  const [sideNav, setSideNav] = useState<'history' | 'tracking'>('history');
 
   // Synchronize currentProfile whenever profile arrives from auth context
   useEffect(() => {
@@ -1447,73 +1413,49 @@ const getBrowserAppName = (): string => {
           </div>
         </div>
 
-        {/* Real-Time Hourly Salary & Accrued Earnings Card */}
-        {(() => {
-          const rate = currentProfile?.hourlyRate ?? 25;
-          const curr = currentProfile?.currency || 'INR';
-          const sym = curr === 'USD' ? '$' : curr === 'EUR' ? '€' : curr === 'GBP' ? '£' : '₹';
-          const otMult = currentProfile?.overtimeMultiplier ?? 1.5;
-          const stdDailyHrs = currentProfile?.standardDailyHours ?? 8;
 
-          // Today worked seconds (active + idle)
-          const todayWorkedSec = isWorking
-            ? (liveActiveSeconds + liveIdleSeconds)
-            : ((todayTotals?.todayActiveSeconds || 0) + (todayTotals?.todayIdleSeconds || 0));
-          const todayHours = todayWorkedSec / 3600;
-          const regularHrs = Math.min(todayHours, stdDailyHrs);
-          const overtimeHrs = Math.max(0, todayHours - stdDailyHrs);
-          const regularPay = regularHrs * rate;
-          const overtimePay = overtimeHrs * rate * otMult;
-          const todayGross = regularPay + overtimePay;
 
-          return (
-            <div className="bg-gradient-to-r from-emerald-500/10 via-teal-500/5 to-white border border-emerald-200/90 rounded-3xl p-6 sm:p-7 shadow-xs relative overflow-hidden">
-              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative z-10">
-                <div className="flex items-start sm:items-center gap-4">
-                  <div className="w-12 h-12 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-emerald-600/20">
-                    <Coins className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2.5 flex-wrap">
-                      <h3 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
-                        Accrued Hourly Earnings & Payroll
-                      </h3>
-                      <span className="bg-emerald-100 text-emerald-800 text-[11px] font-bold px-2.5 py-0.5 rounded-full border border-emerald-200">
-                        {sym}{rate.toFixed(2)} / hr Base Rate
-                      </span>
-                    </div>
-                    <p className="text-xs text-slate-600 mt-1 max-w-xl leading-relaxed">
-                      Real-time accrued wages calculated from active workstation duration, monitored idle intervals, and {otMult}x overtime policy after {stdDailyHrs}h.
-                    </p>
-                  </div>
-                </div>
+        {/* ── Side Navigation: History / Tracking ── */}
+        <div className="flex flex-col lg:flex-row gap-6 sm:gap-8">
 
-                <div className="flex items-center gap-4 flex-wrap sm:flex-nowrap justify-between lg:justify-end">
-                  <div className="text-left sm:text-right">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-                      Today's Calculated Gross
-                    </span>
-                    <span className="text-2xl sm:text-3xl font-black text-emerald-600 tracking-tight font-mono">
-                      {sym}{todayGross.toFixed(2)}
-                    </span>
-                    <span className="text-[11px] font-semibold text-slate-500 block mt-0.5">
-                      {todayHours.toFixed(2)}h total • {regularHrs.toFixed(2)}h reg {overtimeHrs > 0 ? `+ ${overtimeHrs.toFixed(2)}h OT` : ''}
-                    </span>
-                  </div>
+          {/* Side Nav Bar */}
+          <div className="lg:w-52 shrink-0">
+            <nav className="bg-white border border-slate-200/90 rounded-2xl p-2 shadow-sm flex lg:flex-col gap-1.5">
+              <button
+                id="emp-sidenav-history"
+                type="button"
+                onClick={() => setSideNav('history')}
+                className={`flex items-center gap-2.5 px-4 py-3 rounded-xl font-bold text-sm transition-all w-full text-left ${
+                  sideNav === 'history'
+                    ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
+                    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                }`}
+              >
+                <History className="w-4 h-4 shrink-0" />
+                <span>Work History</span>
+              </button>
+              <button
+                id="emp-sidenav-tracking"
+                type="button"
+                onClick={() => setSideNav('tracking')}
+                className={`flex items-center gap-2.5 px-4 py-3 rounded-xl font-bold text-sm transition-all w-full text-left ${
+                  sideNav === 'tracking'
+                    ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
+                    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                }`}
+              >
+                <Activity className="w-4 h-4 shrink-0" />
+                <span>Activity Tracking</span>
+              </button>
+            </nav>
+          </div>
 
-                  <button
-                    onClick={handleOpenMyPayslip}
-                    className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-4 py-2.5 rounded-xl text-xs shadow-md shadow-emerald-600/20 transition-all hover:scale-105 active:scale-95 shrink-0"
-                  >
-                    <FileText className="w-4 h-4" />
-                    View Pay Statement
-                  </button>
-                </div>
-              </div>
-            </div>
-          );
-        })()}
+          {/* Main Panel */}
+          <div className="flex-1 min-w-0">
 
+        {/* ── HISTORY PANEL ── */}
+        {sideNav === 'history' && (
+          <div id="emp-history-panel">
         {/* Full Work & Shift Attendance History Component */}
         <div className="bg-white border border-slate-200/90 rounded-3xl p-5 sm:p-7 shadow-sm space-y-6">
           {/* Header & Filter Controls Bar */}
@@ -1934,7 +1876,15 @@ const getBrowserAppName = (): string => {
             </>
           )}
         </div>
+          </div>
+        )}
 
+
+
+
+          {/* ── TRACKING PANEL ── */}
+          {sideNav === 'tracking' && (
+            <div id="emp-tracking-panel">
         {/* 2-Column Section: Timeline & Software / Website Tracking */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8">
           <div className="lg:col-span-2 space-y-4">
@@ -2283,139 +2233,11 @@ const getBrowserAppName = (): string => {
             </div>
           </div>
         </div>
-
-        {/* Employee Payslip Statement Modal */}
-        {showMyPayslipModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in duration-200">
-            <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden">
-              <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-2xl bg-emerald-600 text-white flex items-center justify-center font-black">
-                    <Coins className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h3 className="text-base font-black text-slate-900">
-                      My Earnings Statement (Month to Date)
-                    </h3>
-                    <p className="text-xs text-slate-500 font-medium">
-                      {company?.name || 'HighP Monitor Workspace'} • Verified Tracking Data
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => window.print()}
-                    className="p-2 rounded-xl text-slate-500 hover:text-slate-800 hover:bg-slate-200/60 transition-colors"
-                    title="Print Statement"
-                  >
-                    <Printer className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => setShowMyPayslipModal(false)}
-                    className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
-                </div>
-              </div>
-
-              <div className="flex-1 overflow-y-auto p-6 space-y-5">
-                {loadingMyPayroll ? (
-                  <div className="py-12 text-center text-slate-400 font-semibold">
-                    <Clock className="w-6 h-6 animate-spin mx-auto mb-2 text-emerald-600" />
-                    Loading your earnings statement...
-                  </div>
-                ) : myPayrollData ? (
-                  <>
-                    <div className="p-4.5 rounded-2xl bg-slate-50 border border-slate-200/80 grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
-                      <div>
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-                          Base Wage
-                        </span>
-                        <span className="font-mono font-extrabold text-slate-900 text-sm mt-0.5 block">
-                          ${myPayrollData.summary.hourlyRate.toFixed(2)}/hr
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-                          Total Hours
-                        </span>
-                        <span className="font-mono font-extrabold text-indigo-700 text-sm mt-0.5 block">
-                          {myPayrollData.summary.totalHours.toFixed(1)} hrs
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-                          Overtime Pay
-                        </span>
-                        <span className="font-mono font-bold text-violet-700 text-sm mt-0.5 block">
-                          ${myPayrollData.summary.overtimePay.toFixed(2)}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-                          Gross Accrued
-                        </span>
-                        <span className="font-mono font-black text-emerald-600 text-base mt-0.5 block">
-                          ${myPayrollData.summary.grossPay.toFixed(2)}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div>
-                      <h4 className="text-xs font-black text-slate-900 mb-2 uppercase tracking-wider">
-                        Daily Attendance & Pay Record
-                      </h4>
-                      <div className="border border-slate-200 rounded-2xl overflow-hidden">
-                        <table className="w-full text-left text-xs font-mono">
-                          <thead>
-                            <tr className="bg-slate-50 text-slate-400 uppercase text-[10px] font-bold tracking-wider border-b border-slate-100 font-sans">
-                              <th className="py-2.5 px-3">Date</th>
-                              <th className="py-2.5 px-3">Active</th>
-                              <th className="py-2.5 px-3">Idle</th>
-                              <th className="py-2.5 px-3">Hours</th>
-                              <th className="py-2.5 px-3 text-right">Day Earnings</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-100">
-                            {myPayrollData.dailyBreakdown.map((row: any) => (
-                              <tr key={row.date} className="hover:bg-slate-50/60">
-                                <td className="py-2 px-3 font-bold text-slate-800">
-                                  {row.date} ({row.dayOfWeek})
-                                </td>
-                                <td className="py-2 px-3 text-emerald-600">
-                                  {formatDuration(row.activeSeconds)}
-                                </td>
-                                <td className="py-2 px-3 text-amber-600">
-                                  {formatDuration(row.idleSeconds)}
-                                </td>
-                                <td className="py-2 px-3 text-indigo-700 font-bold">
-                                  {(row.billableSeconds / 3600).toFixed(1)}h
-                                </td>
-                                <td className="py-2 px-3 text-right font-black text-slate-900">
-                                  ${row.dailyEarnings.toFixed(2)}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  </>
-                ) : null}
-              </div>
-
-              <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end">
-                <button
-                  onClick={() => setShowMyPayslipModal(false)}
-                  className="px-4 py-2 rounded-xl text-xs font-bold bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 transition-colors"
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-          </div>
+        </div>
         )}
+            </div> {/* /main-panel */}
+          </div> {/* /side-nav */}
+
       </main>
     </div>
   );
