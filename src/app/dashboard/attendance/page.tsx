@@ -228,6 +228,7 @@ export default function AttendanceDataPage() {
     sessionId: string;
     sessionIndex: number;
     employeeId: string;
+    date?: string;
     status: string;
     startedAt: string;
     endedAt: string;
@@ -269,206 +270,74 @@ export default function AttendanceDataPage() {
     fetchEmployeesList();
   }, [fetchEmployeesList]);
 
-  // Open Edit Roster Record
-  const openEditRoster = (emp: EmployeeRosterItem) => {
+  // Open Edit Day Record (supports both Daily Roster and Monthly Calendar records)
+  const openEditDayRecord = (params: {
+    employeeId: string;
+    name: string;
+    employeeCode: string;
+    date: string;
+    status: string;
+    shiftStartedAt?: string | null;
+    shiftEndedAt?: string | null;
+    totalActiveSeconds?: number;
+    totalIdleSeconds?: number;
+    totalBreakSeconds?: number;
+  }) => {
     let startTime = '';
-    if (emp.shiftStartedAt) {
-      const d = new Date(emp.shiftStartedAt);
+    if (params.shiftStartedAt) {
+      const d = new Date(params.shiftStartedAt);
       startTime = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
     } else {
       startTime = '09:00';
     }
 
     let endTime = '';
-    if (emp.shiftEndedAt) {
-      const d = new Date(emp.shiftEndedAt);
+    if (params.shiftEndedAt) {
+      const d = new Date(params.shiftEndedAt);
       endTime = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-    } else if (emp.attendanceStatus === 'PRESENT_ACTIVE') {
+    } else if (params.status === 'PRESENT_ACTIVE') {
       endTime = '';
     } else {
       endTime = '17:00';
     }
 
-    const actHrs = (emp.totalActiveSeconds / 3600).toFixed(1);
-    const idlHrs = (emp.totalIdleSeconds / 3600).toFixed(1);
-    const brkMins = Math.round(emp.totalBreakSeconds / 60).toString();
+    const actHrs = ((params.totalActiveSeconds || 0) / 3600).toFixed(1);
+    const idlHrs = ((params.totalIdleSeconds || 0) / 3600).toFixed(1);
+    const brkMins = Math.round((params.totalBreakSeconds || 0) / 60).toString();
 
-    let mappedStatus = emp.attendanceStatus;
+    let mappedStatus = params.status;
     if (mappedStatus === 'SHIFT_COMPLETED') mappedStatus = 'PRESENT';
+    if (!mappedStatus || mappedStatus === 'ABSENT' || mappedStatus === 'WEEKEND') mappedStatus = 'PRESENT';
 
     setEditingRosterItem({
-      employeeId: emp.employeeId,
-      name: emp.name,
-      employeeCode: emp.employeeCode,
-      date: dateStr,
+      employeeId: params.employeeId,
+      name: params.name,
+      employeeCode: params.employeeCode,
+      date: params.date,
       status: mappedStatus,
       startedTime: startTime,
       endedTime: endTime,
-      activeHours: actHrs,
+      activeHours: actHrs !== '0.0' ? actHrs : '8.0',
       idleHours: idlHrs,
-      breakMinutes: brkMins,
+      breakMinutes: brkMins !== '0' ? brkMins : '60',
       adminNote: ''
     });
   };
 
-  // Save Edit Roster Record
-  const handleSaveRosterEdit = async () => {
-    if (!editingRosterItem) return;
-    try {
-      setActionSubmitting(true);
-      let sAt: string | undefined = undefined;
-      let eAt: string | undefined = undefined;
-
-      if (editingRosterItem.startedTime) {
-        sAt = `${editingRosterItem.date}T${editingRosterItem.startedTime}:00`;
-      }
-      if (editingRosterItem.endedTime && editingRosterItem.status !== 'PRESENT_ACTIVE') {
-        eAt = `${editingRosterItem.date}T${editingRosterItem.endedTime}:00`;
-      }
-
-      const actSec = Math.round(parseFloat(editingRosterItem.activeHours || '0') * 3600);
-      const idlSec = Math.round(parseFloat(editingRosterItem.idleHours || '0') * 3600);
-      const brkSec = Math.round(parseInt(editingRosterItem.breakMinutes || '0', 10) * 60);
-
-      await api.patch('/attendance/roster/status', {
-        employeeId: editingRosterItem.employeeId,
-        date: editingRosterItem.date,
-        status: editingRosterItem.status,
-        startedAt: sAt,
-        endedAt: eAt,
-        activeSeconds: actSec,
-        idleSeconds: idlSec,
-        breakSeconds: brkSec,
-        adminNote: editingRosterItem.adminNote || 'Modified by HR'
-      });
-
-      showToast('success', `Attendance updated for ${editingRosterItem.name}`);
-      setEditingRosterItem(null);
-      fetchRoster(dateStr);
-    } catch (err: any) {
-      console.error('Failed to update attendance:', err);
-      showToast('error', err.response?.data?.message || 'Failed to update attendance record');
-    } finally {
-      setActionSubmitting(false);
-    }
-  };
-
-  // Save Manual Attendance Record
-  const handleCreateManualAttendance = async () => {
-    if (!manualForm.employeeId) {
-      showToast('error', 'Please select an employee');
-      return;
-    }
-    try {
-      setActionSubmitting(true);
-      const activeMins = Math.round(parseFloat(manualForm.activeHours || '8') * 60);
-      const breakMins = parseInt(manualForm.breakMinutes || '60', 10);
-
-      await api.post('/attendance/manual', {
-        employeeId: manualForm.employeeId,
-        date: manualForm.date,
-        startTime: manualForm.startTime,
-        endTime: manualForm.endTime,
-        status: manualForm.status,
-        activeMinutes: activeMins,
-        breakMinutes: breakMins,
-        adminNote: manualForm.adminNote || 'Manual attendance entered by HR'
-      });
-
-      showToast('success', 'Manual attendance record created successfully');
-      setShowManualModal(false);
-      fetchRoster(dateStr);
-    } catch (err: any) {
-      console.error('Failed to create manual attendance:', err);
-      showToast('error', err.response?.data?.message || 'Failed to create manual attendance');
-    } finally {
-      setActionSubmitting(false);
-    }
-  };
-
-  // Open Edit Session
-  const openEditSession = (sess: any, index: number, empId: string) => {
-    const sDate = new Date(sess.startedAt);
-    const sTime = `${String(sDate.getHours()).padStart(2, '0')}:${String(sDate.getMinutes()).padStart(2, '0')}`;
-    let eTime = '';
-    if (sess.endedAt) {
-      const eDate = new Date(sess.endedAt);
-      eTime = `${String(eDate.getHours()).padStart(2, '0')}:${String(eDate.getMinutes()).padStart(2, '0')}`;
-    }
-
-    setEditingSessionItem({
-      sessionId: sess._id || sess.id,
-      sessionIndex: index + 1,
-      employeeId: empId,
-      status: sess.status || 'COMPLETED',
-      startedAt: sTime,
-      endedAt: eTime,
-      activeMinutes: Math.round((sess.activeSeconds || 0) / 60),
-      idleMinutes: Math.round((sess.idleSeconds || 0) / 60),
-      breakMinutes: Math.round((sess.breakSeconds || 0) / 60),
-      adminNote: sess.adminNote || ''
+  // Open Edit Roster Record
+  const openEditRoster = (emp: EmployeeRosterItem) => {
+    openEditDayRecord({
+      employeeId: emp.employeeId,
+      name: emp.name,
+      employeeCode: emp.employeeCode,
+      date: dateStr,
+      status: emp.attendanceStatus,
+      shiftStartedAt: emp.shiftStartedAt,
+      shiftEndedAt: emp.shiftEndedAt,
+      totalActiveSeconds: emp.totalActiveSeconds,
+      totalIdleSeconds: emp.totalIdleSeconds,
+      totalBreakSeconds: emp.totalBreakSeconds
     });
-  };
-
-  // Save Edit Session
-  const handleSaveSessionEdit = async () => {
-    if (!editingSessionItem) return;
-    try {
-      setActionSubmitting(true);
-      const sAt = `${dateStr}T${editingSessionItem.startedAt}:00`;
-      let eAt: string | undefined = undefined;
-      if (editingSessionItem.endedAt && editingSessionItem.status !== 'ACTIVE') {
-        eAt = `${dateStr}T${editingSessionItem.endedAt}:00`;
-      }
-
-      await api.put(`/attendance/session/${editingSessionItem.sessionId}`, {
-        startedAt: sAt,
-        endedAt: eAt,
-        activeSeconds: editingSessionItem.activeMinutes * 60,
-        idleSeconds: editingSessionItem.idleMinutes * 60,
-        breakSeconds: editingSessionItem.breakMinutes * 60,
-        status: editingSessionItem.status,
-        adminNote: editingSessionItem.adminNote || 'Modified by HR'
-      });
-
-      showToast('success', `Session #${editingSessionItem.sessionIndex} updated successfully`);
-      setEditingSessionItem(null);
-      if (selectedEmpId) {
-        openFullTracking(selectedEmpId);
-      }
-      fetchRoster(dateStr);
-    } catch (err: any) {
-      console.error('Failed to update session:', err);
-      showToast('error', err.response?.data?.message || 'Failed to update session');
-    } finally {
-      setActionSubmitting(false);
-    }
-  };
-
-  // Confirm Delete
-  const handleConfirmDelete = async () => {
-    if (!deletingItem) return;
-    try {
-      setActionSubmitting(true);
-      if (deletingItem.type === 'daily') {
-        await api.delete(`/attendance/employee/${deletingItem.id}/date/${deletingItem.secondaryId || dateStr}`);
-        showToast('success', `Attendance record deleted for ${deletingItem.name}`);
-        fetchRoster(dateStr);
-      } else if (deletingItem.type === 'session') {
-        await api.delete(`/attendance/session/${deletingItem.id}`);
-        showToast('success', 'Session deleted successfully');
-        if (selectedEmpId) {
-          openFullTracking(selectedEmpId);
-        }
-        fetchRoster(dateStr);
-      }
-      setDeletingItem(null);
-    } catch (err: any) {
-      console.error('Failed to delete item:', err);
-      showToast('error', err.response?.data?.message || 'Failed to delete record');
-    } finally {
-      setActionSubmitting(false);
-    }
   };
 
   // Fetch Daily Attendance Roster
@@ -510,6 +379,11 @@ export default function AttendanceDataPage() {
       const res = await api.get(`/attendance/monthly?year=${year}&month=${month}`);
       if (res.data?.data) {
         setMonthlyData(res.data.data);
+        setSelectedMonthlyEmp((prev) => {
+          if (!prev) return null;
+          const updated = res.data.data.employees?.find((e: any) => e.employeeId === prev.employeeId);
+          return updated || prev;
+        });
       }
     } catch (err: any) {
       console.error('[Attendance] Failed to fetch monthly attendance:', err);
@@ -518,6 +392,178 @@ export default function AttendanceDataPage() {
       setMonthlyLoading(false);
     }
   }, []);
+
+  // Save Edit Roster Record
+  const handleSaveRosterEdit = async () => {
+    if (!editingRosterItem) return;
+    try {
+      setActionSubmitting(true);
+      let sAt: string | undefined = undefined;
+      let eAt: string | undefined = undefined;
+
+      if (editingRosterItem.startedTime) {
+        sAt = `${editingRosterItem.date}T${editingRosterItem.startedTime}:00`;
+      }
+      if (editingRosterItem.endedTime && editingRosterItem.status !== 'PRESENT_ACTIVE') {
+        eAt = `${editingRosterItem.date}T${editingRosterItem.endedTime}:00`;
+      }
+
+      const actSec = Math.round(parseFloat(editingRosterItem.activeHours || '0') * 3600);
+      const idlSec = Math.round(parseFloat(editingRosterItem.idleHours || '0') * 3600);
+      const brkSec = Math.round(parseInt(editingRosterItem.breakMinutes || '0', 10) * 60);
+
+      await api.patch('/attendance/roster/status', {
+        employeeId: editingRosterItem.employeeId,
+        date: editingRosterItem.date,
+        status: editingRosterItem.status,
+        startedAt: sAt,
+        endedAt: eAt,
+        activeSeconds: actSec,
+        idleSeconds: idlSec,
+        breakSeconds: brkSec,
+        adminNote: editingRosterItem.adminNote || 'Modified by HR'
+      });
+
+      showToast('success', `Attendance updated for ${editingRosterItem.name}`);
+      setEditingRosterItem(null);
+      fetchRoster(dateStr);
+      fetchMonthlyAttendance(selectedYear, selectedMonth);
+    } catch (err: any) {
+      console.error('Failed to update attendance:', err);
+      showToast('error', err.response?.data?.message || 'Failed to update attendance record');
+    } finally {
+      setActionSubmitting(false);
+    }
+  };
+
+  // Save Manual Attendance Record
+  const handleCreateManualAttendance = async () => {
+    if (!manualForm.employeeId) {
+      showToast('error', 'Please select an employee');
+      return;
+    }
+    try {
+      setActionSubmitting(true);
+      const activeMins = Math.round(parseFloat(manualForm.activeHours || '8') * 60);
+      const breakMins = parseInt(manualForm.breakMinutes || '60', 10);
+
+      await api.post('/attendance/manual', {
+        employeeId: manualForm.employeeId,
+        date: manualForm.date,
+        startTime: manualForm.startTime,
+        endTime: manualForm.endTime,
+        startedAt: `${manualForm.date}T${manualForm.startTime}:00`,
+        endedAt: manualForm.endTime ? `${manualForm.date}T${manualForm.endTime}:00` : undefined,
+        status: manualForm.status,
+        activeMinutes: activeMins,
+        activeSeconds: activeMins * 60,
+        breakMinutes: breakMins,
+        breakSeconds: breakMins * 60,
+        adminNote: manualForm.adminNote || 'Manual attendance entered by HR'
+      });
+
+      showToast('success', 'Manual attendance record created successfully');
+      setShowManualModal(false);
+      fetchRoster(dateStr);
+      fetchMonthlyAttendance(selectedYear, selectedMonth);
+    } catch (err: any) {
+      console.error('Failed to create manual attendance:', err);
+      showToast('error', err.response?.data?.message || 'Failed to create manual attendance');
+    } finally {
+      setActionSubmitting(false);
+    }
+  };
+
+  // Open Edit Session
+  const openEditSession = (sess: any, index: number, empId: string) => {
+    const sDate = sess.startedAt ? new Date(sess.startedAt) : new Date();
+    const sTime = `${String(sDate.getHours()).padStart(2, '0')}:${String(sDate.getMinutes()).padStart(2, '0')}`;
+    let eTime = '';
+    if (sess.endedAt) {
+      const eDate = new Date(sess.endedAt);
+      eTime = `${String(eDate.getHours()).padStart(2, '0')}:${String(eDate.getMinutes()).padStart(2, '0')}`;
+    }
+    const sessDate = sess.date || (sess.startedAt ? new Date(sess.startedAt).toISOString().slice(0, 10) : dateStr);
+
+    setEditingSessionItem({
+      sessionId: sess._id || sess.id,
+      sessionIndex: index + 1,
+      employeeId: empId,
+      date: sessDate,
+      status: sess.status || 'COMPLETED',
+      startedAt: sTime,
+      endedAt: eTime,
+      activeMinutes: Math.round((sess.activeSeconds || 0) / 60),
+      idleMinutes: Math.round((sess.idleSeconds || 0) / 60),
+      breakMinutes: Math.round((sess.breakSeconds || 0) / 60),
+      adminNote: sess.adminNote || ''
+    });
+  };
+
+  // Save Edit Session
+  const handleSaveSessionEdit = async () => {
+    if (!editingSessionItem) return;
+    try {
+      setActionSubmitting(true);
+      const targetDate = editingSessionItem.date || dateStr;
+      const sAt = `${targetDate}T${editingSessionItem.startedAt}:00`;
+      let eAt: string | undefined = undefined;
+      if (editingSessionItem.endedAt && editingSessionItem.status !== 'ACTIVE') {
+        eAt = `${targetDate}T${editingSessionItem.endedAt}:00`;
+      }
+
+      await api.put(`/attendance/session/${editingSessionItem.sessionId}`, {
+        startedAt: sAt,
+        endedAt: eAt,
+        activeSeconds: editingSessionItem.activeMinutes * 60,
+        idleSeconds: editingSessionItem.idleMinutes * 60,
+        breakSeconds: editingSessionItem.breakMinutes * 60,
+        status: editingSessionItem.status,
+        adminNote: editingSessionItem.adminNote || 'Modified by HR'
+      });
+
+      showToast('success', `Session #${editingSessionItem.sessionIndex} updated successfully`);
+      setEditingSessionItem(null);
+      if (selectedEmpId) {
+        openFullTracking(selectedEmpId);
+      }
+      fetchRoster(dateStr);
+      fetchMonthlyAttendance(selectedYear, selectedMonth);
+    } catch (err: any) {
+      console.error('Failed to update session:', err);
+      showToast('error', err.response?.data?.message || 'Failed to update session');
+    } finally {
+      setActionSubmitting(false);
+    }
+  };
+
+  // Confirm Delete
+  const handleConfirmDelete = async () => {
+    if (!deletingItem) return;
+    try {
+      setActionSubmitting(true);
+      if (deletingItem.type === 'daily') {
+        await api.delete(`/attendance/employee/${deletingItem.id}/date/${deletingItem.secondaryId || dateStr}`);
+        showToast('success', `Attendance record deleted for ${deletingItem.name}`);
+        fetchRoster(dateStr);
+        fetchMonthlyAttendance(selectedYear, selectedMonth);
+      } else if (deletingItem.type === 'session') {
+        await api.delete(`/attendance/session/${deletingItem.id}`);
+        showToast('success', 'Session deleted successfully');
+        if (selectedEmpId) {
+          openFullTracking(selectedEmpId);
+        }
+        fetchRoster(dateStr);
+        fetchMonthlyAttendance(selectedYear, selectedMonth);
+      }
+      setDeletingItem(null);
+    } catch (err: any) {
+      console.error('Failed to delete item:', err);
+      showToast('error', err.response?.data?.message || 'Failed to delete record');
+    } finally {
+      setActionSubmitting(false);
+    }
+  };
 
   useEffect(() => {
     if (viewMode === 'daily') {
@@ -1508,32 +1554,65 @@ export default function AttendanceDataPage() {
 
                           const shiftHrs = d.shiftSeconds > 0 ? (d.shiftSeconds / 3600).toFixed(1) + 'h' : '';
 
-                          return (
-                            <td
-                              key={d.day}
-                              title={`${d.dayOfWeek}, ${d.date}\nStatus: ${d.status}\nWork: ${formatDuration(
+                          const cellTitle = isFuture
+                            ? `${d.dayOfWeek}, ${d.date} (Upcoming Day)`
+                            : `${d.dayOfWeek}, ${d.date}\nStatus: ${d.status}\nWork: ${formatDuration(
                                 d.shiftSeconds
                               )}\nActive: ${formatDuration(d.activeSeconds)}\nIdle: ${formatDuration(
                                 d.idleSeconds
-                              )}\nBreak: ${formatDuration(d.breakSeconds)}`}
-                              className={`py-2 px-1 text-center border-l border-slate-100 ${
+                              )}\nBreak: ${formatDuration(d.breakSeconds)}\n\n👉 Click to Edit or Delete Record`;
+
+                          return (
+                            <td
+                              key={d.day}
+                              title={cellTitle}
+                              onClick={
+                                !isFuture
+                                  ? (e) => {
+                                      e.stopPropagation();
+                                      openEditDayRecord({
+                                        employeeId: emp.employeeId,
+                                        name: emp.name,
+                                        employeeCode: emp.employeeCode,
+                                        date: d.date,
+                                        status: d.status,
+                                        shiftStartedAt: d.firstStart,
+                                        shiftEndedAt: d.lastEnd,
+                                        totalActiveSeconds: d.activeSeconds,
+                                        totalIdleSeconds: d.idleSeconds,
+                                        totalBreakSeconds: d.breakSeconds
+                                      });
+                                    }
+                                  : undefined
+                              }
+                              className={`py-2 px-1 text-center border-l border-slate-100 transition-all ${
                                 d.isToday ? 'bg-indigo-50/40' : isWeekend ? 'bg-slate-50/40' : ''
+                              } ${
+                                !isFuture
+                                  ? 'cursor-pointer hover:bg-indigo-100/70 hover:scale-105 group/cell relative'
+                                  : 'cursor-default opacity-60'
                               }`}
                             >
                               {isLive ? (
-                                <div className="inline-flex flex-col items-center justify-center w-7 h-7 rounded-lg bg-emerald-500 text-white font-black text-[9px] shadow-2xs animate-pulse">
+                                <div className="inline-flex flex-col items-center justify-center w-7 h-7 rounded-lg bg-emerald-500 text-white font-black text-[9px] shadow-2xs animate-pulse group-hover/cell:ring-2 group-hover/cell:ring-emerald-400">
                                   <span>{shiftHrs || 'Live'}</span>
                                 </div>
                               ) : isPresent ? (
-                                <div className="inline-flex flex-col items-center justify-center w-7 h-7 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 font-bold text-[9px]">
+                                <div className="inline-flex flex-col items-center justify-center w-7 h-7 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 font-bold text-[9px] group-hover/cell:bg-emerald-100 group-hover/cell:border-emerald-400 shadow-2xs">
                                   <span>{shiftHrs || 'P'}</span>
                                 </div>
                               ) : isWeekend ? (
-                                <span className="text-[10px] text-slate-300 font-mono">·</span>
+                                d.shiftSeconds > 0 ? (
+                                  <div className="inline-flex flex-col items-center justify-center w-7 h-7 rounded-lg bg-purple-50 border border-purple-200 text-purple-800 font-bold text-[9px] group-hover/cell:border-purple-400">
+                                    <span>{shiftHrs}</span>
+                                  </div>
+                                ) : (
+                                  <span className="text-[10px] text-slate-300 font-mono group-hover/cell:text-indigo-600 font-bold">·</span>
+                                )
                               ) : isFuture ? (
                                 <span className="text-[10px] text-slate-200 font-mono">—</span>
                               ) : isAbsent ? (
-                                <div className="inline-flex items-center justify-center w-6 h-6 rounded-md text-rose-500 font-black text-[10px]">
+                                <div className="inline-flex items-center justify-center w-6 h-6 rounded-md text-rose-500 font-black text-[10px] group-hover/cell:bg-rose-100 group-hover/cell:text-rose-700">
                                   A
                                 </div>
                               ) : null}
@@ -1548,33 +1627,39 @@ export default function AttendanceDataPage() {
             </div>
 
             {/* Monthly Legend */}
-            <div className="flex items-center gap-6 text-[11px] text-slate-500 pt-2 border-t border-slate-100 flex-wrap">
-              <span className="font-bold text-slate-700 uppercase tracking-wider text-[10px]">Legend:</span>
-              <div className="flex items-center gap-1.5">
-                <span className="w-4 h-4 rounded bg-emerald-500 text-white text-[9px] font-bold flex items-center justify-center">
-                  Live
-                </span>
-                <span>Active Right Now</span>
+            <div className="flex items-center justify-between gap-4 text-[11px] text-slate-500 pt-2 border-t border-slate-100 flex-wrap">
+              <div className="flex items-center gap-6 flex-wrap">
+                <span className="font-bold text-slate-700 uppercase tracking-wider text-[10px]">Legend:</span>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-4 h-4 rounded bg-emerald-500 text-white text-[9px] font-bold flex items-center justify-center">
+                    Live
+                  </span>
+                  <span>Active Right Now</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-4 h-4 rounded bg-emerald-50 border border-emerald-200 text-emerald-800 text-[9px] font-bold flex items-center justify-center">
+                    8h
+                  </span>
+                  <span>Present (Hours Logged)</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-4 h-4 text-rose-500 text-[10px] font-black flex items-center justify-center">
+                    A
+                  </span>
+                  <span>Absent (Working Day)</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-slate-300 text-[11px] font-bold">·</span>
+                  <span>Weekend / Rest Day</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-slate-200 text-[11px] font-bold">—</span>
+                  <span>Future Day</span>
+                </div>
               </div>
-              <div className="flex items-center gap-1.5">
-                <span className="w-4 h-4 rounded bg-emerald-50 border border-emerald-200 text-emerald-800 text-[9px] font-bold flex items-center justify-center">
-                  8h
-                </span>
-                <span>Present (Hours Logged)</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="w-4 h-4 text-rose-500 text-[10px] font-black flex items-center justify-center">
-                  A
-                </span>
-                <span>Absent (Working Day)</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="text-slate-300 text-[11px] font-bold">·</span>
-                <span>Weekend / Rest Day</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="text-slate-200 text-[11px] font-bold">—</span>
-                <span>Future Day</span>
+              <div className="flex items-center gap-1.5 text-[11px] text-indigo-600 font-medium bg-indigo-50/70 px-2.5 py-1 rounded-lg border border-indigo-100">
+                <Pencil className="w-3 h-3" />
+                <span>Click any past date cell to edit or delete record</span>
               </div>
             </div>
           </div>
@@ -1926,13 +2011,37 @@ export default function AttendanceDataPage() {
                 </div>
               </div>
 
-              <button
-                onClick={() => setSelectedMonthlyEmp(null)}
-                className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors"
-                title="Close"
-              >
-                <X className="w-5 h-5" />
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setManualForm({
+                      employeeId: selectedMonthlyEmp.employeeId,
+                      date: getLocalDateString(),
+                      startTime: '09:00',
+                      endTime: '17:00',
+                      status: 'PRESENT',
+                      activeHours: '8',
+                      breakMinutes: '60',
+                      adminNote: ''
+                    });
+                    setShowManualModal(true);
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-bold transition-colors shadow-2xs"
+                  title="Manually log or backdate attendance"
+                >
+                  <PlusCircle className="w-3.5 h-3.5" />
+                  <span>Log Attendance</span>
+                </button>
+
+                <button
+                  onClick={() => setSelectedMonthlyEmp(null)}
+                  className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors"
+                  title="Close"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
 
             {/* Modal Body */}
@@ -2059,34 +2168,108 @@ export default function AttendanceDataPage() {
                           </div>
                         </div>
 
-                        {/* Durations & Split Bar */}
-                        <div className="text-right">
-                          <span className="font-mono font-bold text-slate-900 block">
-                            {d.shiftSeconds > 0 ? formatDuration(d.shiftSeconds) : isWeekend ? 'Rest Day' : '—'}
-                          </span>
+                        {/* Durations, Split Bar & Actions */}
+                        <div className="flex items-center gap-4">
+                          <div className="text-right">
+                            <span className="font-mono font-bold text-slate-900 block">
+                              {d.shiftSeconds > 0 ? formatDuration(d.shiftSeconds) : isWeekend ? 'Rest Day' : '—'}
+                            </span>
 
-                          {d.shiftSeconds > 0 && (
-                            <div className="flex items-center gap-2 mt-1">
-                              <div className="w-24 bg-slate-200 rounded-full h-1.5 overflow-hidden flex">
-                                <div
-                                  className="bg-emerald-500 h-1.5"
-                                  style={{ width: `${Math.round((d.activeSeconds / d.shiftSeconds) * 100)}%` }}
-                                  title={`Active: ${formatDuration(d.activeSeconds)}`}
-                                />
-                                <div
-                                  className="bg-amber-400 h-1.5"
-                                  style={{ width: `${Math.round((d.idleSeconds / d.shiftSeconds) * 100)}%` }}
-                                  title={`Idle: ${formatDuration(d.idleSeconds)}`}
-                                />
-                                <div
-                                  className="bg-sky-400 h-1.5"
-                                  style={{ width: `${Math.round((d.breakSeconds / d.shiftSeconds) * 100)}%` }}
-                                  title={`Break: ${formatDuration(d.breakSeconds)}`}
-                                />
+                            {d.shiftSeconds > 0 && (
+                              <div className="flex items-center gap-2 mt-1">
+                                <div className="w-24 bg-slate-200 rounded-full h-1.5 overflow-hidden flex">
+                                  <div
+                                    className="bg-emerald-500 h-1.5"
+                                    style={{ width: `${Math.round((d.activeSeconds / d.shiftSeconds) * 100)}%` }}
+                                    title={`Active: ${formatDuration(d.activeSeconds)}`}
+                                  />
+                                  <div
+                                    className="bg-amber-400 h-1.5"
+                                    style={{ width: `${Math.round((d.idleSeconds / d.shiftSeconds) * 100)}%` }}
+                                    title={`Idle: ${formatDuration(d.idleSeconds)}`}
+                                  />
+                                  <div
+                                    className="bg-sky-400 h-1.5"
+                                    style={{ width: `${Math.round((d.breakSeconds / d.shiftSeconds) * 100)}%` }}
+                                    title={`Break: ${formatDuration(d.breakSeconds)}`}
+                                  />
+                                </div>
+                                <span className="text-[10px] text-emerald-700 font-mono font-bold">
+                                  {formatDuration(d.activeSeconds)} act
+                                </span>
                               </div>
-                              <span className="text-[10px] text-emerald-700 font-mono font-bold">
-                                {formatDuration(d.activeSeconds)} act
-                              </span>
+                            )}
+                          </div>
+
+                          {/* Quick Admin Actions (Edit & Delete for past & today) */}
+                          {!isFuture && (
+                            <div className="flex items-center gap-1 pl-2 border-l border-slate-200 shrink-0">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openEditDayRecord({
+                                    employeeId: selectedMonthlyEmp.employeeId,
+                                    name: selectedMonthlyEmp.name,
+                                    employeeCode: selectedMonthlyEmp.employeeCode,
+                                    date: d.date,
+                                    status: d.status,
+                                    shiftStartedAt: d.firstStart,
+                                    shiftEndedAt: d.lastEnd,
+                                    totalActiveSeconds: d.activeSeconds,
+                                    totalIdleSeconds: d.idleSeconds,
+                                    totalBreakSeconds: d.breakSeconds
+                                  });
+                                }}
+                                className="p-1.5 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-300 transition-colors shadow-2xs"
+                                title={`Edit Attendance for ${d.date}`}
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                              </button>
+
+                              {(d.shiftSeconds > 0 || d.status !== 'ABSENT') ? (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setDeletingItem({
+                                      type: 'daily',
+                                      id: selectedMonthlyEmp.employeeId,
+                                      secondaryId: d.date,
+                                      name: selectedMonthlyEmp.name,
+                                      date: d.date,
+                                      label: `attendance for ${selectedMonthlyEmp.name} on ${d.date}`
+                                    });
+                                  }}
+                                  className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 border border-slate-200 hover:border-rose-300 transition-colors shadow-2xs"
+                                  title={`Delete Attendance for ${d.date}`}
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    openEditDayRecord({
+                                      employeeId: selectedMonthlyEmp.employeeId,
+                                      name: selectedMonthlyEmp.name,
+                                      employeeCode: selectedMonthlyEmp.employeeCode,
+                                      date: d.date,
+                                      status: 'PRESENT',
+                                      shiftStartedAt: null,
+                                      shiftEndedAt: null,
+                                      totalActiveSeconds: 28800,
+                                      totalIdleSeconds: 0,
+                                      totalBreakSeconds: 3600
+                                    });
+                                  }}
+                                  className="px-2 py-1 rounded-lg text-[10px] font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 transition-colors shadow-2xs"
+                                  title={`Log Attendance for ${d.date}`}
+                                >
+                                  + Log
+                                </button>
+                              )}
                             </div>
                           )}
                         </div>
@@ -2242,21 +2425,44 @@ export default function AttendanceDataPage() {
               </div>
             </div>
 
-            <div className="p-4 border-t border-slate-200 bg-slate-50 flex items-center justify-end gap-3">
+            <div className="p-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between gap-3">
               <button
-                onClick={() => setEditingRosterItem(null)}
-                className="px-4 py-2 rounded-xl border border-slate-200 text-slate-700 font-bold text-xs hover:bg-slate-100 transition-colors"
+                type="button"
+                onClick={() => {
+                  const targetEmp = editingRosterItem;
+                  setDeletingItem({
+                    type: 'daily',
+                    id: targetEmp.employeeId,
+                    secondaryId: targetEmp.date,
+                    name: targetEmp.name,
+                    date: targetEmp.date,
+                    label: `attendance record for ${targetEmp.name} on ${targetEmp.date}`
+                  });
+                  setEditingRosterItem(null);
+                }}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-rose-600 hover:bg-rose-50 border border-rose-200 text-xs font-bold transition-colors shadow-2xs hover:border-rose-300"
+                title="Delete this day's attendance record"
               >
-                Cancel
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Delete Day Record</span>
               </button>
-              <button
-                onClick={handleSaveRosterEdit}
-                disabled={actionSubmitting}
-                className="flex items-center gap-2 px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-xs transition-colors disabled:opacity-50"
-              >
-                <Save className="w-3.5 h-3.5" />
-                <span>{actionSubmitting ? 'Saving...' : 'Save Record'}</span>
-              </button>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setEditingRosterItem(null)}
+                  className="px-4 py-2 rounded-xl border border-slate-200 text-slate-700 font-bold text-xs hover:bg-slate-100 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveRosterEdit}
+                  disabled={actionSubmitting}
+                  className="flex items-center gap-2 px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-xs transition-colors disabled:opacity-50"
+                >
+                  <Save className="w-3.5 h-3.5" />
+                  <span>{actionSubmitting ? 'Saving...' : 'Save Record'}</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>

@@ -1168,188 +1168,297 @@ const getBrowserAppName = (): string => {
             </div>
           </div>
 
-          {/* Daily Attendance Marking & Session Timings Banner */}
-          <div className="mt-8 pt-6 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-50/70 p-4.5 sm:p-5 rounded-2xl border border-slate-200/80 relative z-10">
-            <div className="flex items-center gap-3">
-              <div
-                className={`w-10 h-10 rounded-xl border flex items-center justify-center text-xs font-bold shrink-0 ${
-                  isWorking
-                    ? 'bg-emerald-50 text-emerald-700 border-emerald-300 shadow-2xs'
-                    : completedSessions.length > 0
-                    ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
-                    : 'bg-slate-100 text-slate-400 border-slate-200'
-                }`}
-              >
-                <Clock className="w-5 h-5" />
-              </div>
-              <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-                  Daily Attendance Log
-                </span>
-                <span className="text-xs sm:text-sm font-extrabold text-slate-900 mt-0.5 block">
-                  {isWorking ? (
-                    <span className="inline-flex items-center gap-1.5 text-emerald-700">
-                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                      Present • Working Now
-                    </span>
-                  ) : completedSessions.length > 0 ? (
-                    <span className="inline-flex items-center gap-1.5 text-slate-700">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                      Work Concluded (Clocked Out)
-                    </span>
-                  ) : (
-                    <span className="text-slate-500">Not Clocked In Today</span>
-                  )}
-                </span>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 w-full">
-              <div className="bg-white px-3.5 py-2.5 rounded-xl border border-slate-200 shadow-2xs">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-                  {isWorking ? 'Start Work (Current Session)' : lastCompletedSession ? 'Start Work (Last Session)' : 'Start Work (Clock In)'}
-                </span>
-                <span className="font-mono font-bold text-slate-800 text-xs sm:text-sm mt-0.5 block">
-                  {isWorking && currentSession?.startedAt ? (
-                    new Date(currentSession.startedAt).toLocaleTimeString([], {
-                      hour: '2-digit',
-                      minute: '2-digit'
-                    })
-                  ) : !isWorking && lastCompletedSession?.startedAt ? (
-                    new Date(lastCompletedSession.startedAt).toLocaleTimeString([], {
-                      hour: '2-digit',
-                      minute: '2-digit'
-                    })
-                  ) : isWorking ? (
-                    'Marking now...'
-                  ) : (
-                    '—'
-                  )}
-                </span>
-              </div>
-
-              <div className="bg-white px-3.5 py-2 rounded-xl border border-slate-200 shadow-2xs">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-                  {isWorking ? 'Current Status' : 'End Work (Clock Out)'}
-                </span>
-                <span className="font-mono font-bold text-slate-800 text-xs sm:text-sm mt-0.5 block">
-                  {isWorking ? (
-                    <span className="inline-flex items-center gap-1.5 font-bold">
-                      <span className={`w-1.5 h-1.5 rounded-full ${isOnBreak ? 'bg-indigo-500' : isIdle || currentProfile?.currentStatus === 'IDLE' ? 'bg-amber-500' : 'bg-emerald-500 animate-pulse'}`} />
-                      <span className={isOnBreak ? 'text-indigo-700' : isIdle || currentProfile?.currentStatus === 'IDLE' ? 'text-amber-700' : 'text-emerald-700'}>
-                        {isOnBreak ? 'On Break' : isIdle || currentProfile?.currentStatus === 'IDLE' ? 'Workstation Idle' : 'Working Now'}
+          {/* ── AUTHORITATIVE ATTENDANCE & SHIFT HUB ── */}
+          <div className="mt-8 pt-6 border-t border-slate-100 space-y-6 relative z-10">
+            {/* Main Attendance Card */}
+            <div className={`p-6 sm:p-7 rounded-3xl border transition-all shadow-sm ${
+              isWorking
+                ? 'bg-gradient-to-br from-white via-emerald-50/20 to-white border-emerald-200/80 shadow-emerald-500/5'
+                : completedSessions.length > 0
+                ? 'bg-gradient-to-br from-white via-indigo-50/20 to-white border-indigo-200/80 shadow-indigo-500/5'
+                : 'bg-white border-slate-200/90'
+            }`}>
+              {/* Header row: Title & Live Attendance Pill */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-100">
+                <div className="flex items-center gap-3.5">
+                  <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-bold text-lg shadow-sm shrink-0 transition-transform ${
+                    isWorking
+                      ? 'bg-emerald-600 text-white shadow-emerald-600/25 scale-105'
+                      : completedSessions.length > 0
+                      ? 'bg-indigo-600 text-white shadow-indigo-600/20'
+                      : 'bg-slate-100 text-slate-500'
+                  }`}>
+                    <Clock className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2.5 flex-wrap">
+                      <h3 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
+                        Today's Work & Attendance Session
+                      </h3>
+                      <span className="text-[11px] font-mono font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200">
+                        {todayStr}
                       </span>
+                    </div>
+                    <p className="text-xs text-slate-500 font-medium mt-0.5">
+                      Real-time shift telemetry verified and tracked directly through your HighP Desktop Agent
+                    </p>
+                  </div>
+                </div>
+
+                {/* Status Badge */}
+                <div className="flex items-center gap-2">
+                  {isWorking ? (
+                    isOnBreak ? (
+                      <span className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl text-xs font-black bg-amber-50 text-amber-800 border border-amber-300 shadow-2xs">
+                        <Coffee className="w-4 h-4 text-amber-600" />
+                        <span>ON BREAK</span>
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl text-xs font-black bg-emerald-50 text-emerald-800 border border-emerald-300 shadow-2xs">
+                        <span className="relative flex h-2.5 w-2.5">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                        </span>
+                        <span>PRESENT • WORKING NOW</span>
+                      </span>
+                    )
+                  ) : completedSessions.length > 0 ? (
+                    <span className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl text-xs font-black bg-indigo-50 text-indigo-800 border border-indigo-200 shadow-2xs">
+                      <CheckCircle2 className="w-4 h-4 text-indigo-600" />
+                      <span>SHIFT CONCLUDED</span>
                     </span>
-                  ) : !isWorking && lastCompletedSession?.endedAt ? (
-                    new Date(lastCompletedSession.endedAt).toLocaleTimeString([], {
-                      hour: '2-digit',
-                      minute: '2-digit'
-                    })
                   ) : (
-                    '—'
+                    <span className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl text-xs font-black bg-slate-100 text-slate-600 border border-slate-200">
+                      <Moon className="w-4 h-4 text-slate-400" />
+                      <span>STANDBY (NOT CLOCKED IN)</span>
+                    </span>
                   )}
-                </span>
+                </div>
               </div>
 
-              <div className="bg-white px-3.5 py-2 rounded-xl border border-slate-200 shadow-2xs">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-                  {isWorking ? 'Current Session Duration' : lastCompletedSession ? 'Last Session Duration' : 'Total Work Duration'}
-                </span>
-                <span className="font-mono font-bold text-indigo-700 text-xs sm:text-sm mt-0.5 block">
-                  {(() => {
-                    if (isWorking) {
-                      const startTime = currentSession?.startedAt || currentProfile?.currentShiftStartedAt;
+              {/* 4 Feature KPI Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
+                {/* Clock In Time */}
+                <div className="bg-slate-50/80 hover:bg-slate-50 border border-slate-200/80 p-4.5 rounded-2xl transition-all">
+                  <div className="flex items-center justify-between text-slate-400 mb-2">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                      Start Work Time (Clock In)
+                    </span>
+                    <Clock className="w-4 h-4 text-indigo-500" />
+                  </div>
+                  <div className="text-xl sm:text-2xl font-black font-mono text-slate-900 tracking-tight">
+                    {(() => {
+                      const startTime = currentSession?.startedAt || todayTotals?.firstSessionStart || currentProfile?.currentShiftStartedAt;
                       if (startTime) {
-                        const elapsedSec = Math.max(0, Math.round((Date.now() - new Date(startTime).getTime()) / 1000));
-                        return formatDuration(elapsedSec);
+                        return new Date(startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
                       }
-                      return formatDuration(liveActiveSeconds + liveIdleSeconds + liveBreakSeconds);
-                    }
-                    if (lastCompletedSession && lastCompletedSession.durationSeconds != null) {
-                      return formatDuration(lastCompletedSession.durationSeconds);
-                    }
-                    if (completedSessions.length > 0) {
-                      const last = completedSessions[completedSessions.length - 1];
-                      if (last.durationSeconds != null) return formatDuration(last.durationSeconds);
-                      if (last.endedAt && last.startedAt) {
-                        return formatDuration(Math.max(0, Math.round((new Date(last.endedAt).getTime() - new Date(last.startedAt).getTime()) / 1000)));
+                      if (lastCompletedSession?.startedAt) {
+                        return new Date(lastCompletedSession.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                       }
-                    }
-                    return '0m';
-                  })()}
-                </span>
-              </div>
-            </div>
-          </div>
+                      return isWorking ? 'Marking now...' : '—';
+                    })()}
+                  </div>
+                  <p className="text-[11px] font-semibold text-slate-500 mt-1.5 flex items-center gap-1">
+                    {isWorking ? (
+                      <span className="text-emerald-700 font-bold inline-flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> First clock-in today
+                      </span>
+                    ) : lastCompletedSession ? (
+                      'Last logged shift'
+                    ) : (
+                      'Launch agent to clock in'
+                    )}
+                  </p>
+                </div>
 
-          {/* Active Software / Website Focus Indicator */}
-          {isWorking && (
-            <div className="mt-4 flex items-center justify-between gap-3 bg-indigo-50/70 border border-indigo-100/90 px-4 py-2.5 rounded-xl text-xs flex-wrap">
-              <div className="flex items-center gap-2">
-                <Monitor className="w-4 h-4 text-indigo-600 shrink-0" />
-                <span className="font-bold text-slate-500 uppercase tracking-wider text-[10px]">Active Focus:</span>
-                <span className="font-bold text-slate-900">{isOnBreak ? 'On Break' : isIdle ? 'Idle / Inactive' : currentAppFocus}</span>
+                {/* Current Working Duration */}
+                <div className="bg-slate-50/80 hover:bg-slate-50 border border-slate-200/80 p-4.5 rounded-2xl transition-all">
+                  <div className="flex items-center justify-between text-slate-400 mb-2">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                      How Long Working (Session)
+                    </span>
+                    <Timer className="w-4 h-4 text-emerald-500" />
+                  </div>
+                  <div className="text-xl sm:text-2xl font-black font-mono text-emerald-700 tracking-tight">
+                    {(() => {
+                      if (isWorking) {
+                        const startTime = currentSession?.startedAt || currentProfile?.currentShiftStartedAt;
+                        if (startTime) {
+                          const elapsedSec = Math.max(0, Math.round((Date.now() - new Date(startTime).getTime()) / 1000));
+                          return formatDurationExact(elapsedSec);
+                        }
+                        return formatDurationExact(liveActiveSeconds + liveIdleSeconds + liveBreakSeconds);
+                      }
+                      if (lastCompletedSession && lastCompletedSession.durationSeconds != null) {
+                        return formatDuration(lastCompletedSession.durationSeconds);
+                      }
+                      return '00:00:00';
+                    })()}
+                  </div>
+                  <p className="text-[11px] font-semibold text-slate-500 mt-1.5 flex items-center gap-1">
+                    {isWorking ? (
+                      <span className="text-emerald-600 font-bold inline-flex items-center gap-1 animate-pulse">
+                        ● Ticking live shift duration
+                      </span>
+                    ) : (
+                      'Current session time'
+                    )}
+                  </p>
+                </div>
+
+                {/* Total Day Shift Time */}
+                <div className="bg-slate-50/80 hover:bg-slate-50 border border-slate-200/80 p-4.5 rounded-2xl transition-all">
+                  <div className="flex items-center justify-between text-slate-400 mb-2">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                      Total Work Time Today
+                    </span>
+                    <Zap className="w-4 h-4 text-indigo-500" />
+                  </div>
+                  <div className="text-xl sm:text-2xl font-black font-mono text-indigo-900 tracking-tight">
+                    {formatDuration((todayTotals?.todayShiftDuration ?? currentProfile?.todayShiftDuration) || (liveActiveSeconds + liveIdleSeconds + liveBreakSeconds))}
+                  </div>
+                  <p className="text-[11px] font-semibold text-slate-500 mt-1.5 flex items-center gap-1">
+                    {completedSessions.length + (isWorking ? 1 : 0)} session{completedSessions.length + (isWorking ? 1 : 0) === 1 ? '' : 's'} recorded today
+                  </p>
+                </div>
+
+                {/* Active Application / Focus */}
+                <div className="bg-slate-50/80 hover:bg-slate-50 border border-slate-200/80 p-4.5 rounded-2xl transition-all">
+                  <div className="flex items-center justify-between text-slate-400 mb-2">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                      Active Application Focus
+                    </span>
+                    <Monitor className="w-4 h-4 text-cyan-600" />
+                  </div>
+                  <div className="text-sm sm:text-base font-extrabold text-slate-900 truncate tracking-tight" title={isOnBreak ? 'On Break' : isIdle ? 'Idle / Inactive' : currentAppFocus}>
+                    {isOnBreak ? '☕ On Break' : isIdle ? '⏳ Workstation Idle' : currentAppFocus}
+                  </div>
+                  <div className="mt-1.5 flex items-center gap-1.5 truncate">
+                    {(currentProfile?.currentWebsiteDomain || currentProfile?.currentWebsite?.domain) && !isIdle && !isOnBreak ? (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-mono text-cyan-800 bg-cyan-50 px-2 py-0.5 rounded border border-cyan-200 truncate">
+                        <Globe className="w-3 h-3 text-cyan-600 shrink-0" />
+                        <span className="truncate">{currentProfile?.currentWebsiteDomain || currentProfile?.currentWebsite?.domain}</span>
+                      </span>
+                    ) : (
+                      <span className="text-[11px] font-semibold text-slate-500">
+                        {isWorking ? 'Foreground app monitored' : 'Standby'}
+                      </span>
+                    )}
+                  </div>
+                </div>
               </div>
-              {(currentProfile?.currentWebsiteDomain || currentProfile?.currentWebsite?.domain) && !isIdle && !isOnBreak && (
-                <span className="inline-flex items-center gap-1.5 text-[11px] font-mono text-cyan-800 bg-cyan-50 px-2.5 py-0.5 rounded-lg border border-cyan-200">
-                  <Globe className="w-3.5 h-3.5 text-cyan-600 shrink-0" />
-                  {currentProfile?.currentWebsiteDomain || currentProfile?.currentWebsite?.domain}
-                </span>
+
+              {/* Work Balance Ratio Bar */}
+              {isWorking && (
+                <div className="mt-6 pt-5 border-t border-slate-100 space-y-3">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-bold text-slate-700 uppercase tracking-wider text-[10px] flex items-center gap-1.5">
+                      <Activity className="w-3.5 h-3.5 text-indigo-600" />
+                      Daily Work Ratio Balance
+                    </span>
+                    <span className="font-mono text-slate-500 text-[11px]">
+                      {Math.round(((liveActiveSeconds) / Math.max(1, (liveActiveSeconds + liveIdleSeconds + liveBreakSeconds))) * 100)}% Focus Rate
+                    </span>
+                  </div>
+
+                  {/* Horizontal Segmented Bar */}
+                  {(() => {
+                    const totalSec = Math.max(1, liveActiveSeconds + liveIdleSeconds + liveBreakSeconds);
+                    const actPct = Math.round((liveActiveSeconds / totalSec) * 100);
+                    const idlPct = Math.round((liveIdleSeconds / totalSec) * 100);
+                    const brkPct = Math.max(0, 100 - actPct - idlPct);
+
+                    return (
+                      <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden flex shadow-inner">
+                        <div
+                          className="bg-emerald-500 transition-all duration-500"
+                          style={{ width: `${actPct}%` }}
+                          title={`Active: ${formatDuration(liveActiveSeconds)} (${actPct}%)`}
+                        />
+                        <div
+                          className="bg-amber-400 transition-all duration-500"
+                          style={{ width: `${idlPct}%` }}
+                          title={`Idle: ${formatDuration(liveIdleSeconds)} (${idlPct}%)`}
+                        />
+                        <div
+                          className="bg-indigo-400 transition-all duration-500"
+                          style={{ width: `${brkPct}%` }}
+                          title={`Break: ${formatDuration(liveBreakSeconds)} (${brkPct}%)`}
+                        />
+                      </div>
+                    );
+                  })()}
+
+                  <div className="flex items-center justify-between text-[11px] text-slate-500 flex-wrap gap-2 pt-1 font-medium font-mono">
+                    <span className="inline-flex items-center gap-1.5 text-emerald-800">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                      Active: {formatDuration(liveActiveSeconds)}
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 text-amber-800">
+                      <span className="w-2 h-2 rounded-full bg-amber-400" />
+                      Idle: {formatDuration(liveIdleSeconds)}
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 text-indigo-800">
+                      <span className="w-2 h-2 rounded-full bg-indigo-400" />
+                      Break: {formatDuration(liveBreakSeconds)}
+                    </span>
+                  </div>
+                </div>
               )}
             </div>
-          )}
 
-          {/* Metric Grid: Today's Cumulative Totals */}
-          <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-6 mt-8 pt-6 border-t border-slate-100 text-center relative z-10">
-            <div className="bg-slate-50/80 p-4 sm:p-5 rounded-2xl border border-slate-200/80 shadow-2xs transition-all hover:bg-slate-50">
-              <span className="text-[11px] font-bold text-slate-500 block uppercase tracking-wider">
-                Active Work Today
-              </span>
-              <span className="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-2 block tracking-tight font-sans">
-                {formatDuration((todayTotals?.todayActiveSeconds ?? currentProfile?.todayActiveSeconds) || 0)}
-              </span>
-              <span className="text-[11px] font-semibold text-emerald-700 mt-1 inline-flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                {isWorking ? 'Current session: ' + formatDurationExact(liveActiveSeconds) : 'All sessions saved'}
-              </span>
-            </div>
+            {/* Metric Grid: Today's Cumulative Totals */}
+            <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-6 text-center">
+              <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/80 shadow-2xs transition-all hover:bg-slate-50">
+                <span className="text-[11px] font-bold text-slate-500 block uppercase tracking-wider">
+                  Active Work Today
+                </span>
+                <span className="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-2 block tracking-tight font-sans">
+                  {formatDuration((todayTotals?.todayActiveSeconds ?? currentProfile?.todayActiveSeconds) || 0)}
+                </span>
+                <span className="text-[11px] font-semibold text-emerald-700 mt-1 inline-flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                  {isWorking ? 'Current session: ' + formatDurationExact(liveActiveSeconds) : 'All sessions saved'}
+                </span>
+              </div>
 
-            <div className="bg-slate-50/80 p-5 rounded-2xl border border-slate-200/80 shadow-2xs transition-all hover:bg-slate-50">
-              <span className="text-[11px] font-bold text-slate-500 block uppercase tracking-wider">
-                Idle Inactivity
-              </span>
-              <span className="text-2xl sm:text-3xl font-extrabold text-amber-600 mt-2 block tracking-tight font-sans">
-                {formatDuration((todayTotals?.todayIdleSeconds ?? currentProfile?.todayIdleSeconds) || 0)}
-              </span>
-              <span className="text-[11px] font-semibold text-amber-700 mt-1 inline-flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-                {isWorking ? 'Current session: ' + formatDurationExact(liveIdleSeconds) : 'Away from desk'}
-              </span>
-            </div>
+              <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs transition-all hover:bg-slate-50">
+                <span className="text-[11px] font-bold text-slate-500 block uppercase tracking-wider">
+                  Idle Inactivity
+                </span>
+                <span className="text-2xl sm:text-3xl font-extrabold text-amber-600 mt-2 block tracking-tight font-sans">
+                  {formatDuration((todayTotals?.todayIdleSeconds ?? currentProfile?.todayIdleSeconds) || 0)}
+                </span>
+                <span className="text-[11px] font-semibold text-amber-700 mt-1 inline-flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                  {isWorking ? 'Current session: ' + formatDurationExact(liveIdleSeconds) : 'Away from desk'}
+                </span>
+              </div>
 
-            <div className="bg-slate-50/80 p-5 rounded-2xl border border-slate-200/80 shadow-2xs transition-all hover:bg-slate-50">
-              <span className="text-[11px] font-bold text-slate-500 block uppercase tracking-wider">
-                Total Breaks
-              </span>
-              <span className="text-2xl sm:text-3xl font-extrabold text-indigo-600 mt-2 block tracking-tight font-sans">
-                {formatDuration((todayTotals?.todayBreakSeconds ?? currentProfile?.todayBreakSeconds) || 0)}
-              </span>
-              <span className="text-[11px] font-semibold text-indigo-700 mt-1 inline-flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
-                {isWorking ? 'Current session: ' + formatDurationExact(liveBreakSeconds) : 'Logged breaks'}
-              </span>
-            </div>
+              <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs transition-all hover:bg-slate-50">
+                <span className="text-[11px] font-bold text-slate-500 block uppercase tracking-wider">
+                  Total Breaks
+                </span>
+                <span className="text-2xl sm:text-3xl font-extrabold text-indigo-600 mt-2 block tracking-tight font-sans">
+                  {formatDuration((todayTotals?.todayBreakSeconds ?? currentProfile?.todayBreakSeconds) || 0)}
+                </span>
+                <span className="text-[11px] font-semibold text-indigo-700 mt-1 inline-flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+                  {isWorking ? 'Current session: ' + formatDurationExact(liveBreakSeconds) : 'Logged breaks'}
+                </span>
+              </div>
 
-            <div className="bg-slate-50/80 p-5 rounded-2xl border border-slate-200/80 shadow-2xs transition-all hover:bg-slate-50">
-              <span className="text-[11px] font-bold text-slate-500 block uppercase tracking-wider">
-                Today's Total Work Time
-              </span>
-              <span className="text-2xl sm:text-3xl font-extrabold text-indigo-900 mt-2 block tracking-tight font-sans">
-                {formatDuration((todayTotals?.todayShiftDuration ?? currentProfile?.todayShiftDuration) || 0)}
-              </span>
-              <span className="text-[11px] font-semibold text-slate-500 mt-1 inline-flex items-center gap-1">
-                {completedSessions.length + (isWorking ? 1 : 0)} session{completedSessions.length + (isWorking ? 1 : 0) === 1 ? '' : 's'} recorded today
-              </span>
+              <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs transition-all hover:bg-slate-50">
+                <span className="text-[11px] font-bold text-slate-500 block uppercase tracking-wider">
+                  Today's Total Shift Time
+                </span>
+                <span className="text-2xl sm:text-3xl font-extrabold text-indigo-900 mt-2 block tracking-tight font-sans">
+                  {formatDuration((todayTotals?.todayShiftDuration ?? currentProfile?.todayShiftDuration) || 0)}
+                </span>
+                <span className="text-[11px] font-semibold text-slate-500 mt-1 inline-flex items-center gap-1">
+                  {completedSessions.length + (isWorking ? 1 : 0)} session{completedSessions.length + (isWorking ? 1 : 0) === 1 ? '' : 's'} recorded today
+                </span>
+              </div>
             </div>
           </div>
         </div>

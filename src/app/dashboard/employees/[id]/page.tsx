@@ -19,7 +19,13 @@ import {
   Zap,
   Activity,
   UserCheck,
-  Globe
+  Globe,
+  Pencil,
+  Trash2,
+  PlusCircle,
+  X,
+  Save,
+  AlertTriangle
 } from 'lucide-react';
 import { ActivityState } from '@highp/shared';
 
@@ -33,6 +39,40 @@ export default function EmployeeDetailPage() {
   const [appUsages, setAppUsages] = useState<any[]>([]);
   const [attendanceHistory, setAttendanceHistory] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Admin Attendance Editing & Deleting State
+  const [editingSession, setEditingSession] = useState<{
+    id: string;
+    date: string;
+    startedTime: string;
+    endedTime: string;
+    activeMinutes: number;
+    idleMinutes: number;
+    breakMinutes: number;
+    status: string;
+    adminNote: string;
+  } | null>(null);
+  const [deletingSession, setDeletingSession] = useState<{
+    id: string;
+    label: string;
+  } | null>(null);
+  const [showManualModal, setShowManualModal] = useState(false);
+  const [manualForm, setManualForm] = useState({
+    date: getLocalDateString(),
+    startTime: '09:00',
+    endTime: '17:00',
+    status: 'PRESENT',
+    activeHours: '8',
+    breakMinutes: '60',
+    adminNote: 'Manual HR entry'
+  });
+  const [actionSubmitting, setActionSubmitting] = useState(false);
+  const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  const showToast = (type: 'success' | 'error', message: string) => {
+    setToast({ type, message });
+    setTimeout(() => setToast(null), 3500);
+  };
 
   const fetchEmployeeData = useCallback(async () => {
     if (!employeeId) return;
@@ -96,6 +136,108 @@ export default function EmployeeDetailPage() {
       };
     }
   }, [fetchEmployeeData, employeeId]);
+
+  // Open Edit Session Modal
+  const openEditSessionModal = (sess: any) => {
+    const sDate = sess.startedAt ? new Date(sess.startedAt) : new Date();
+    const sTime = `${String(sDate.getHours()).padStart(2, '0')}:${String(sDate.getMinutes()).padStart(2, '0')}`;
+    let eTime = '';
+    if (sess.endedAt) {
+      const eDate = new Date(sess.endedAt);
+      eTime = `${String(eDate.getHours()).padStart(2, '0')}:${String(eDate.getMinutes()).padStart(2, '0')}`;
+    }
+    const sessDate = sess.date || (sess.startedAt ? new Date(sess.startedAt).toISOString().slice(0, 10) : dateStr);
+
+    setEditingSession({
+      id: sess._id || sess.id,
+      date: sessDate,
+      startedTime: sTime,
+      endedTime: eTime,
+      activeMinutes: Math.round((sess.activeSeconds || 0) / 60),
+      idleMinutes: Math.round((sess.idleSeconds || 0) / 60),
+      breakMinutes: Math.round((sess.breakSeconds || 0) / 60),
+      status: sess.status || 'COMPLETED',
+      adminNote: sess.adminNote || ''
+    });
+  };
+
+  // Save Session Edit
+  const handleSaveEditSession = async () => {
+    if (!editingSession) return;
+    try {
+      setActionSubmitting(true);
+      const sAt = `${editingSession.date}T${editingSession.startedTime}:00`;
+      let eAt: string | undefined = undefined;
+      if (editingSession.endedTime && editingSession.status !== 'ACTIVE') {
+        eAt = `${editingSession.date}T${editingSession.endedTime}:00`;
+      }
+
+      await api.put(`/attendance/session/${editingSession.id}`, {
+        startedAt: sAt,
+        endedAt: eAt,
+        activeSeconds: editingSession.activeMinutes * 60,
+        idleSeconds: editingSession.idleMinutes * 60,
+        breakSeconds: editingSession.breakMinutes * 60,
+        status: editingSession.status,
+        adminNote: editingSession.adminNote || 'Modified by HR Admin'
+      });
+
+      showToast('success', 'Attendance session updated successfully.');
+      setEditingSession(null);
+      fetchEmployeeData();
+    } catch (err: any) {
+      console.error('Failed to update session:', err);
+      showToast('error', err.response?.data?.message || 'Failed to update session.');
+    } finally {
+      setActionSubmitting(false);
+    }
+  };
+
+  // Delete Session
+  const handleDeleteSession = async () => {
+    if (!deletingSession) return;
+    try {
+      setActionSubmitting(true);
+      await api.delete(`/attendance/session/${deletingSession.id}`);
+      showToast('success', 'Attendance session deleted.');
+      setDeletingSession(null);
+      fetchEmployeeData();
+    } catch (err: any) {
+      console.error('Failed to delete session:', err);
+      showToast('error', err.response?.data?.message || 'Failed to delete session.');
+    } finally {
+      setActionSubmitting(false);
+    }
+  };
+
+  // Create Manual Session
+  const handleCreateManualSession = async () => {
+    try {
+      setActionSubmitting(true);
+      const activeMins = Math.round(parseFloat(manualForm.activeHours || '8') * 60);
+      const breakMins = parseInt(manualForm.breakMinutes || '60', 10);
+
+      await api.post('/attendance/manual', {
+        employeeId,
+        date: manualForm.date,
+        startTime: manualForm.startTime,
+        endTime: manualForm.endTime,
+        status: manualForm.status,
+        activeMinutes: activeMins,
+        breakMinutes: breakMins,
+        adminNote: manualForm.adminNote || 'Manual attendance added by HR Admin'
+      });
+
+      showToast('success', 'Manual attendance session logged successfully.');
+      setShowManualModal(false);
+      fetchEmployeeData();
+    } catch (err: any) {
+      console.error('Failed to create manual attendance:', err);
+      showToast('error', err.response?.data?.message || 'Failed to create manual session.');
+    } finally {
+      setActionSubmitting(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -339,32 +481,81 @@ export default function EmployeeDetailPage() {
               )}
             </div>
 
-            {/* Attendance History */}
+            {/* Attendance History with Admin Controls */}
             <div className="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-xs">
-              <h3 className="text-sm font-bold text-slate-900 mb-4 pb-3 border-b border-slate-100">
-                Recent Work Sessions
-              </h3>
-              <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
+              <div className="flex items-center justify-between gap-3 mb-4 pb-3 border-b border-slate-100 flex-wrap">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">Recent Work Sessions</h3>
+                  <p className="text-[11px] text-slate-500">Edit, log, or delete attendance records</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowManualModal(true)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs"
+                >
+                  <PlusCircle className="w-3.5 h-3.5" />
+                  <span>Record Manual Session</span>
+                </button>
+              </div>
+
+              <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
                 {attendanceHistory.length === 0 ? (
                   <p className="text-xs text-slate-400 py-6 text-center">No attendance sessions recorded.</p>
                 ) : (
                   attendanceHistory.map((att, i) => (
                     <div
-                      key={i}
-                      className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs hover:bg-slate-100 transition-colors"
+                      key={att._id || i}
+                      className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs hover:bg-slate-100/70 transition-all space-y-2"
                     >
-                      <div className="flex justify-between font-bold">
-                        <span className="text-slate-900">{new Date(att.startedAt).toLocaleDateString()}</span>
-                        <span className="text-emerald-700">{formatDuration(att.activeSeconds)} active</span>
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="font-extrabold text-slate-900 font-sans">
+                            {new Date(att.startedAt).toLocaleDateString()}
+                          </span>
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                            att.status === 'ACTIVE'
+                              ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                              : 'bg-slate-200 text-slate-700'
+                          }`}>
+                            {att.status || 'COMPLETED'}
+                          </span>
+                        </div>
+
+                        {/* Action Buttons */}
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => openEditSessionModal(att)}
+                            className="p-1.5 hover:bg-indigo-50 text-slate-500 hover:text-indigo-600 rounded-lg transition-colors cursor-pointer"
+                            title="Edit Attendance Session"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setDeletingSession({
+                              id: att._id || att.id,
+                              label: `session on ${new Date(att.startedAt).toLocaleDateString()} (${new Date(att.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})`
+                            })}
+                            className="p-1.5 hover:bg-rose-50 text-slate-400 hover:text-rose-600 rounded-lg transition-colors cursor-pointer"
+                            title="Delete Session"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </div>
-                      <div className="flex justify-between text-[11px] text-slate-500 mt-1 font-medium font-mono">
+
+                      <div className="flex items-center justify-between text-[11px] text-slate-500 font-medium font-mono pt-1 border-t border-slate-200/60">
                         <span>
                           {new Date(att.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} →{' '}
                           {att.endedAt
                             ? new Date(att.endedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
                             : 'In Progress'}
                         </span>
-                        <span className="text-amber-700">{formatDuration(att.idleSeconds)} idle</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-emerald-700 font-bold">{formatDuration(att.activeSeconds)} act</span>
+                          <span className="text-amber-700 font-bold">{formatDuration(att.idleSeconds)} idl</span>
+                        </div>
                       </div>
                     </div>
                   ))
@@ -373,6 +564,324 @@ export default function EmployeeDetailPage() {
             </div>
           </div>
         </div>
+
+        {/* ── EDIT SESSION MODAL ── */}
+        {editingSession && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fade-in">
+            <div className="bg-white border border-slate-200 rounded-3xl w-full max-w-md shadow-2xl overflow-hidden">
+              <div className="p-5 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold">
+                    <Pencil className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black text-slate-900">Edit Attendance Session</h3>
+                    <p className="text-[11px] text-slate-500">Date: {editingSession.date}</p>
+                  </div>
+                </div>
+                <button onClick={() => setEditingSession(null)} className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="p-5 space-y-3.5 text-xs max-h-[75vh] overflow-y-auto">
+                <div>
+                  <label className="font-bold text-slate-700 uppercase tracking-wider text-[10px] block mb-1">
+                    Status
+                  </label>
+                  <select
+                    value={editingSession.status}
+                    onChange={(e) => setEditingSession({ ...editingSession, status: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800"
+                  >
+                    <option value="COMPLETED">Completed Shift</option>
+                    <option value="ACTIVE">Active (In Progress)</option>
+                    <option value="TIMEOUT">Timeout / Inactive</option>
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="font-bold text-slate-700 uppercase tracking-wider text-[10px] block mb-1">
+                      Start Time
+                    </label>
+                    <input
+                      type="time"
+                      value={editingSession.startedTime}
+                      onChange={(e) => setEditingSession({ ...editingSession, startedTime: e.target.value })}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono font-bold text-slate-800"
+                    />
+                  </div>
+                  <div>
+                    <label className="font-bold text-slate-700 uppercase tracking-wider text-[10px] block mb-1">
+                      End Time
+                    </label>
+                    <input
+                      type="time"
+                      value={editingSession.endedTime}
+                      disabled={editingSession.status === 'ACTIVE'}
+                      onChange={(e) => setEditingSession({ ...editingSession, endedTime: e.target.value })}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono font-bold text-slate-800 disabled:opacity-50"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2.5">
+                  <div>
+                    <label className="font-bold text-slate-700 uppercase tracking-wider text-[10px] block mb-1">
+                      Active (Min)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={editingSession.activeMinutes}
+                      onChange={(e) => setEditingSession({ ...editingSession, activeMinutes: Math.max(0, parseInt(e.target.value, 10) || 0) })}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono font-bold text-slate-800"
+                    />
+                  </div>
+                  <div>
+                    <label className="font-bold text-slate-700 uppercase tracking-wider text-[10px] block mb-1">
+                      Idle (Min)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={editingSession.idleMinutes}
+                      onChange={(e) => setEditingSession({ ...editingSession, idleMinutes: Math.max(0, parseInt(e.target.value, 10) || 0) })}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono font-bold text-slate-800"
+                    />
+                  </div>
+                  <div>
+                    <label className="font-bold text-slate-700 uppercase tracking-wider text-[10px] block mb-1">
+                      Break (Min)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={editingSession.breakMinutes}
+                      onChange={(e) => setEditingSession({ ...editingSession, breakMinutes: Math.max(0, parseInt(e.target.value, 10) || 0) })}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono font-bold text-slate-800"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="font-bold text-slate-700 uppercase tracking-wider text-[10px] block mb-1">
+                    Audit Note
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={editingSession.adminNote}
+                    onChange={(e) => setEditingSession({ ...editingSession, adminNote: e.target.value })}
+                    placeholder="Reason for adjustment"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-800"
+                  />
+                </div>
+              </div>
+
+              <div className="p-4 border-t border-slate-200 bg-slate-50 flex items-center justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setEditingSession(null)}
+                  className="px-3.5 py-1.5 rounded-xl border border-slate-200 text-slate-600 font-bold text-xs"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveEditSession}
+                  disabled={actionSubmitting}
+                  className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs disabled:opacity-50"
+                >
+                  <Save className="w-3.5 h-3.5" />
+                  <span>{actionSubmitting ? 'Saving...' : 'Save Changes'}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── DELETE SESSION MODAL ── */}
+        {deletingSession && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fade-in">
+            <div className="bg-white border border-slate-200 rounded-3xl w-full max-w-sm shadow-2xl p-5 space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
+                  <Trash2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">Delete Attendance Session</h3>
+                  <p className="text-xs text-slate-500">This action will remove {deletingSession.label}.</p>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setDeletingSession(null)}
+                  className="px-3.5 py-1.5 rounded-xl border border-slate-200 text-slate-600 font-bold text-xs"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDeleteSession}
+                  disabled={actionSubmitting}
+                  className="px-4 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs disabled:opacity-50"
+                >
+                  {actionSubmitting ? 'Deleting...' : 'Delete Session'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── CREATE MANUAL SESSION MODAL ── */}
+        {showManualModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fade-in">
+            <div className="bg-white border border-slate-200 rounded-3xl w-full max-w-md shadow-2xl overflow-hidden">
+              <div className="p-5 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold">
+                    <PlusCircle className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black text-slate-900">Record Manual Session</h3>
+                    <p className="text-[11px] text-slate-500">Add an attendance shift for this employee</p>
+                  </div>
+                </div>
+                <button onClick={() => setShowManualModal(false)} className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="p-5 space-y-3.5 text-xs max-h-[75vh] overflow-y-auto">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="font-bold text-slate-700 uppercase tracking-wider text-[10px] block mb-1">
+                      Date *
+                    </label>
+                    <input
+                      type="date"
+                      value={manualForm.date}
+                      onChange={(e) => setManualForm({ ...manualForm, date: e.target.value })}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800"
+                    />
+                  </div>
+                  <div>
+                    <label className="font-bold text-slate-700 uppercase tracking-wider text-[10px] block mb-1">
+                      Status *
+                    </label>
+                    <select
+                      value={manualForm.status}
+                      onChange={(e) => setManualForm({ ...manualForm, status: e.target.value })}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800"
+                    >
+                      <option value="PRESENT">Present (Full Day)</option>
+                      <option value="HALF_DAY">Half Day</option>
+                      <option value="PRESENT_ACTIVE">Active Now</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="font-bold text-slate-700 uppercase tracking-wider text-[10px] block mb-1">
+                      Start Time
+                    </label>
+                    <input
+                      type="time"
+                      value={manualForm.startTime}
+                      onChange={(e) => setManualForm({ ...manualForm, startTime: e.target.value })}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono font-bold text-slate-800"
+                    />
+                  </div>
+                  <div>
+                    <label className="font-bold text-slate-700 uppercase tracking-wider text-[10px] block mb-1">
+                      End Time
+                    </label>
+                    <input
+                      type="time"
+                      value={manualForm.endTime}
+                      onChange={(e) => setManualForm({ ...manualForm, endTime: e.target.value })}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono font-bold text-slate-800"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="font-bold text-slate-700 uppercase tracking-wider text-[10px] block mb-1">
+                      Active Hours
+                    </label>
+                    <input
+                      type="number"
+                      step="0.5"
+                      min="0"
+                      max="24"
+                      value={manualForm.activeHours}
+                      onChange={(e) => setManualForm({ ...manualForm, activeHours: e.target.value })}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono font-bold text-slate-800"
+                    />
+                  </div>
+                  <div>
+                    <label className="font-bold text-slate-700 uppercase tracking-wider text-[10px] block mb-1">
+                      Break (Min)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={manualForm.breakMinutes}
+                      onChange={(e) => setManualForm({ ...manualForm, breakMinutes: e.target.value })}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono font-bold text-slate-800"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="font-bold text-slate-700 uppercase tracking-wider text-[10px] block mb-1">
+                    Audit Note
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={manualForm.adminNote}
+                    onChange={(e) => setManualForm({ ...manualForm, adminNote: e.target.value })}
+                    placeholder="e.g. Approved on-site client meeting"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-800"
+                  />
+                </div>
+              </div>
+
+              <div className="p-4 border-t border-slate-200 bg-slate-50 flex items-center justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setShowManualModal(false)}
+                  className="px-3.5 py-1.5 rounded-xl border border-slate-200 text-slate-600 font-bold text-xs"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCreateManualSession}
+                  disabled={actionSubmitting}
+                  className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs disabled:opacity-50"
+                >
+                  <PlusCircle className="w-3.5 h-3.5" />
+                  <span>{actionSubmitting ? 'Recording...' : 'Record Session'}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── TOAST ALERT ── */}
+        {toast && (
+          <div className={`fixed bottom-6 right-6 z-50 px-4 py-3 rounded-2xl shadow-xl text-xs font-bold text-white transition-all animate-bounce ${
+            toast.type === 'success' ? 'bg-emerald-600' : 'bg-rose-600'
+          }`}>
+            {toast.message}
+          </div>
+        )}
       </main>
     </div>
   );
